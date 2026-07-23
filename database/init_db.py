@@ -96,9 +96,52 @@ def crear_tablas_cotizaciones():
         conexion.close()
 
 
+def crear_estructura_comercial():
+    conexion = obtener_conexion()
+    try:
+        columnas = {
+            fila["name"] for fila in conexion.execute("PRAGMA table_info(cotizaciones)")
+        }
+        nuevas_columnas = {
+            "tipo_cambio": "REAL NOT NULL DEFAULT 3.50",
+            "descuento_porcentaje": "REAL NOT NULL DEFAULT 0",
+            "igv_porcentaje": "REAL NOT NULL DEFAULT 18",
+            "subtotal_materiales": "REAL NOT NULL DEFAULT 0",
+            "subtotal_adicionales": "REAL NOT NULL DEFAULT 0",
+            "subtotal_venta": "REAL NOT NULL DEFAULT 0",
+            "igv_monto": "REAL NOT NULL DEFAULT 0",
+            "total_venta": "REAL NOT NULL DEFAULT 0",
+        }
+        for nombre, definicion in nuevas_columnas.items():
+            if nombre not in columnas:
+                conexion.execute(
+                    f"ALTER TABLE cotizaciones ADD COLUMN {nombre} {definicion}"
+                )
+
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS costos_adicionales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cotizacion_id INTEGER NOT NULL,
+                descripcion TEXT NOT NULL,
+                cantidad REAL NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+                costo_unitario REAL NOT NULL DEFAULT 0 CHECK (costo_unitario >= 0),
+                recargo_porcentaje REAL NOT NULL DEFAULT 0 CHECK (recargo_porcentaje >= 0),
+                precio_unitario REAL NOT NULL DEFAULT 0 CHECK (precio_unitario >= 0),
+                subtotal REAL NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
+                FOREIGN KEY (cotizacion_id) REFERENCES cotizaciones(id) ON DELETE CASCADE
+            )
+            """
+        )
+        conexion.commit()
+    finally:
+        conexion.close()
+
+
 def inicializar_base_datos():
     crear_tabla_componentes()
     crear_tablas_cotizaciones()
+    crear_estructura_comercial()
 
 
 if __name__ == "__main__":
