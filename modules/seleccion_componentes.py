@@ -349,7 +349,8 @@ def generar_requerimientos_contraincendio(cotizacion):
             "tipo_componente": "rele_termico",
             "nota": (
                 f"Un relé térmico cuyo rango incluya la corriente derrateada "
-                f"de la bomba jockey: {corriente_jockey:.2f} A."
+                f"de la bomba jockey: {corriente_jockey:.2f} A. Si no existe "
+                f"un rango que la incluya, se muestra el rango disponible más próximo."
             ),
         },
     ]
@@ -861,27 +862,57 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
     if criterio and corriente_requerida is not None:
         if criterio == "rango":
             candidatos["rango_corriente"] = candidatos.apply(
-                lambda fila: extraer_rango_corriente(
-                    f"{fila['descripcion']} {fila['modelo']}"
+                lambda fila: (
+                    extraer_rango_corriente(
+                        f"{fila['descripcion']} {fila['modelo']}"
+                    )
+                    or (
+                        (
+                            float(fila["corriente_nominal"]),
+                            float(fila["corriente_nominal"]),
+                        )
+                        if float(fila["corriente_nominal"] or 0) > 0
+                        else None
+                    )
                 ),
                 axis=1,
             )
             candidatos = candidatos[
-                candidatos["rango_corriente"].apply(
-                    lambda rango: (
-                        rango is not None
-                        and rango[0] <= corriente_requerida <= rango[1]
-                    )
-                )
+                candidatos["rango_corriente"].notna()
             ].copy()
             if candidatos.empty:
                 return candidatos.reset_index(drop=True)
+
+            dentro_rango = candidatos[
+                candidatos["rango_corriente"].apply(
+                    lambda rango: rango[0] <= corriente_requerida <= rango[1]
+                )
+            ].copy()
+            if not dentro_rango.empty:
+                candidatos = dentro_rango
+                candidatos["distancia_corriente"] = 0.0
+            else:
+                candidatos["distancia_corriente"] = candidatos[
+                    "rango_corriente"
+                ].apply(
+                    lambda rango: min(
+                        abs(corriente_requerida - rango[0]),
+                        abs(corriente_requerida - rango[1]),
+                    )
+                )
+                distancia_minima = candidatos["distancia_corriente"].min()
+                candidatos = candidatos[
+                    candidatos["distancia_corriente"] == distancia_minima
+                ].copy()
             candidatos["corriente_seleccion"] = candidatos[
                 "rango_corriente"
             ].apply(lambda rango: rango[1])
             return candidatos.sort_values(
-                ["corriente_seleccion", "puntaje", "stock", "descripcion"],
-                ascending=[True, False, False, True],
+                [
+                    "distancia_corriente", "corriente_seleccion",
+                    "puntaje", "stock", "descripcion",
+                ],
+                ascending=[True, True, False, False, True],
             ).head(limite).reset_index(drop=True)
         candidatos["corriente_seleccion"] = candidatos.apply(
             lambda fila: (
