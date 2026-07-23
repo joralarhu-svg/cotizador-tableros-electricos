@@ -47,6 +47,10 @@ class SeleccionComponentesTest(unittest.TestCase):
         self.assertEqual(proteccion_general["grupo"], "Protección general")
         self.assertAlmostEqual(proteccion_general["corriente_requerida"], 30.8)
         self.assertEqual(requerimientos[2]["grupo"], "Circuitos derivados")
+        self.assertEqual(
+            requerimientos[2]["tipo_componente"],
+            "proteccion_circuito_derivado",
+        )
 
     def test_calcula_derrateo_y_extrae_corriente(self):
         from modules.seleccion_componentes import (
@@ -196,6 +200,58 @@ class SeleccionComponentesTest(unittest.TestCase):
             generar_requerimientos(cotizacion)[0], cotizacion
         )
         self.assertEqual(candidatos["codigo"].tolist(), ["VDF-220"])
+
+    def test_circuitos_derivados_admite_interruptores_y_guardamotores_suficientes(self):
+        from modules.inventario import guardar_componentes
+        from modules.seleccion_componentes import (
+            buscar_candidatos, generar_requerimientos, obtener_cotizacion,
+        )
+        base = {
+            "unidad": "und", "stock": 5, "stock_minimo": 0,
+            "costo_unitario": 100, "moneda": "PEN", "proveedor": "",
+            "ubicacion": "", "estado": "Activo", "observaciones": "",
+            "marca": "Prueba",
+        }
+        guardar_componentes(pd.DataFrame([
+            {
+                **base, "codigo": "TM-10A",
+                "descripcion": "Interruptor termomagnético 3P 10A",
+                "categoria": "Interruptores termomagnéticos", "modelo": "C10",
+                "corriente_nominal": 10,
+            },
+            {
+                **base, "codigo": "TM-16A",
+                "descripcion": "Interruptor termomagnético 3P 16A",
+                "categoria": "Interruptores termomagnéticos", "modelo": "C16",
+                "corriente_nominal": 16,
+            },
+            {
+                **base, "codigo": "GM-12-18A",
+                "descripcion": "Guardamotor regulable 12-18 A",
+                "categoria": "Guardamotores", "modelo": "GM18",
+                "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "CONT-25A",
+                "descripcion": "Contactor de potencia 25A",
+                "categoria": "Contactores", "modelo": "C25",
+                "corriente_nominal": 25,
+            },
+        ]))
+        creada = self._crear_cotizacion()
+        cotizacion = obtener_cotizacion(creada["id"])
+        requerimiento = next(
+            item for item in generar_requerimientos(cotizacion)
+            if item["grupo"] == "Circuitos derivados"
+        )
+        candidatos = buscar_candidatos(requerimiento, cotizacion)
+        self.assertEqual(
+            candidatos["codigo"].tolist(),
+            ["TM-16A", "GM-12-18A"],
+        )
+        self.assertTrue(
+            (candidatos["corriente_seleccion"] >= 15.4).all()
+        )
 
 
 if __name__ == "__main__":
