@@ -646,6 +646,131 @@ class SeleccionComponentesTest(unittest.TestCase):
             )
             self.assertEqual(candidatos["codigo"].tolist(), codigos)
 
+    def test_contraincendio_softstarter_filtra_protecciones_y_mando(self):
+        from modules.inventario import guardar_componentes
+        from modules.seleccion_componentes import (
+            buscar_candidatos,
+            generar_requerimientos,
+        )
+
+        base = {
+            "unidad": "und", "stock": 10, "stock_minimo": 0,
+            "costo_unitario": 30, "moneda": "PEN", "proveedor": "",
+            "ubicacion": "", "estado": "Activo", "observaciones": "",
+            "marca": "Prueba", "modelo": "",
+        }
+        componentes = []
+        for codigo, amperios in [
+            ("INT-3P-10", 10), ("INT-3P-16", 16), ("INT-3P-50", 50),
+            ("INT-3P-63", 63), ("INT-3P-80", 80),
+        ]:
+            componentes.append({
+                **base, "codigo": codigo,
+                "descripcion": f"Interruptor termomagnético trifásico 3P {amperios}A",
+                "categoria": "Interruptores",
+                "corriente_nominal": amperios,
+            })
+        componentes.extend([
+            {
+                **base, "codigo": "INT-1P-10",
+                "descripcion": "Interruptor termomagnético monopolar 1P 10A",
+                "categoria": "Interruptores", "corriente_nominal": 10,
+            },
+            {
+                **base, "codigo": "INT-4P-50",
+                "descripcion": "Interruptor termomagnético tetrapolar 4P 50A",
+                "categoria": "Interruptores", "corriente_nominal": 50,
+            },
+            {
+                **base, "codigo": "CON-9",
+                "descripcion": "Contactor de potencia AC-3 9A",
+                "categoria": "Contactores", "corriente_nominal": 9,
+            },
+            {
+                **base, "codigo": "CON-12",
+                "descripcion": "Contactor de potencia AC-3 12A",
+                "categoria": "Contactores", "corriente_nominal": 12,
+            },
+            {
+                **base, "codigo": "REL-7-10",
+                "descripcion": "Relé térmico regulable 7-10A",
+                "categoria": "Relés térmicos", "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "REL-9-13",
+                "descripcion": "Relé térmico regulable 9-13A",
+                "categoria": "Relés térmicos", "corriente_nominal": 0,
+            },
+        ])
+        accesorios = [
+            ("PIL-AM", "Piloto de señalización amarillo 22mm"),
+            ("PIL-VE", "Piloto de señalización verde 22mm"),
+            ("PIL-RO", "Piloto de señalización rojo 22mm"),
+            ("CONM", "Conmutador selector de puerta 2 posiciones"),
+            ("PUL-NA", "Pulsador rasante verde 1NA"),
+            ("PUL-NC", "Pulsador rasante rojo 1NC"),
+        ]
+        for codigo, descripcion in accesorios:
+            componentes.append({
+                **base, "codigo": codigo, "descripcion": descripcion,
+                "categoria": "Mando y señalización", "corriente_nominal": 0,
+            })
+        guardar_componentes(pd.DataFrame(componentes))
+
+        cotizacion = {
+            "tipo_tablero": "Contraincendio",
+            "tipo_control": "Softstarter",
+            "potencia_hp": 15,
+            "corriente_motor": 30,
+            "potencia_jockey_hp": 3,
+            "corriente_jockey": 8,
+            "altitud_msnm": 2000,
+            "tension": 380,
+            "fases": 3,
+            "cantidad_bombas": 2,
+        }
+        requerimientos = {
+            item["grupo"]: item
+            for item in generar_requerimientos(cotizacion)
+        }
+        self.assertAlmostEqual(
+            requerimientos["Protección general contraincendio"][
+                "corriente_requerida"
+            ],
+            41.8,
+        )
+        self.assertAlmostEqual(
+            requerimientos["Protección trifásica de bomba jockey"][
+                "corriente_requerida"
+            ],
+            8.8,
+        )
+        esperados = {
+            "Protección general contraincendio": ["INT-3P-50", "INT-3P-63"],
+            "Protección trifásica de bomba jockey": ["INT-3P-10", "INT-3P-16"],
+            "Contactor de bomba jockey": ["CON-9", "CON-12"],
+            "Relé térmico de bomba jockey": ["REL-7-10"],
+            "Accesorios de puerta - Piloto amarillo": ["PIL-AM"],
+            "Accesorios de puerta - Pilotos verdes": ["PIL-VE"],
+            "Accesorios de puerta - Pilotos rojos": ["PIL-RO"],
+            "Accesorios de puerta - Conmutador": ["CONM"],
+            "Accesorios de puerta - Pulsador NA": ["PUL-NA"],
+            "Accesorios de puerta - Pulsador NC": ["PUL-NC"],
+        }
+        cantidades = {
+            "Accesorios de puerta - Piloto amarillo": 1,
+            "Accesorios de puerta - Pilotos verdes": 2,
+            "Accesorios de puerta - Pilotos rojos": 3,
+            "Accesorios de puerta - Conmutador": 1,
+            "Accesorios de puerta - Pulsador NA": 1,
+            "Accesorios de puerta - Pulsador NC": 1,
+        }
+        for grupo, codigos in esperados.items():
+            candidatos = buscar_candidatos(requerimientos[grupo], cotizacion)
+            self.assertEqual(candidatos["codigo"].tolist(), codigos)
+        for grupo, cantidad in cantidades.items():
+            self.assertEqual(requerimientos[grupo]["cantidad"], cantidad)
+
 
 if __name__ == "__main__":
     unittest.main()
