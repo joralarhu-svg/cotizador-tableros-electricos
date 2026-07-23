@@ -12,44 +12,72 @@ from modules.cotizaciones import (
 inicializar_base_datos()
 st.set_page_config(page_title="Nueva cotización", page_icon="🧾", layout="wide")
 st.title("🧾 Nueva cotización")
-st.write("Registre el cliente y los datos técnicos del sistema de presión constante.")
+st.write("Registre el cliente y los datos técnicos del tablero solicitado.")
 
 clientes = obtener_clientes()
 
-with st.form("formulario_cotizacion", clear_on_submit=False):
-    st.subheader("1. Datos del cliente")
-    modo_cliente = st.radio(
-        "Cliente", ["Registrar nuevo cliente", "Seleccionar cliente existente"],
-        horizontal=True,
-    )
-    cliente_id = None
-    datos_cliente = None
-    if modo_cliente == "Seleccionar cliente existente" and not clientes.empty:
-        opciones = dict(zip(clientes["razon_social"], clientes["id"]))
-        cliente_seleccionado = st.selectbox("Cliente registrado", opciones.keys())
-        cliente_id = int(opciones[cliente_seleccionado])
-    else:
-        if modo_cliente == "Seleccionar cliente existente" and clientes.empty:
-            st.info("Todavía no existen clientes registrados. Complete un nuevo cliente.")
-        c1, c2, c3 = st.columns([1, 1, 2])
-        tipo_documento = c1.selectbox("Tipo de documento", ["RUC", "DNI", "CE", "Otro"])
-        numero_documento = c2.text_input("Número de documento")
-        razon_social = c3.text_input("Razón social o nombre *")
-        c1, c2, c3 = st.columns(3)
-        contacto = c1.text_input("Persona de contacto")
-        telefono = c2.text_input("Teléfono")
-        correo = c3.text_input("Correo")
-        direccion = st.text_input("Dirección")
-        datos_cliente = {
-            "tipo_documento": tipo_documento, "numero_documento": numero_documento,
-            "razon_social": razon_social, "contacto": contacto, "telefono": telefono,
-            "correo": correo, "direccion": direccion,
-        }
+st.subheader("1. Datos del cliente")
+modo_cliente = st.radio(
+    "Cliente", ["Registrar nuevo cliente", "Seleccionar cliente existente"],
+    horizontal=True,
+)
+cliente_id = None
+datos_cliente = None
+if modo_cliente == "Seleccionar cliente existente" and not clientes.empty:
+    opciones = dict(zip(clientes["razon_social"], clientes["id"]))
+    cliente_seleccionado = st.selectbox("Cliente registrado", opciones.keys())
+    cliente_id = int(opciones[cliente_seleccionado])
+else:
+    if modo_cliente == "Seleccionar cliente existente" and clientes.empty:
+        st.info("Todavía no existen clientes registrados. Complete un nuevo cliente.")
+    c1, c2, c3 = st.columns([1, 1, 2])
+    tipo_documento = c1.selectbox("Tipo de documento", ["RUC", "DNI", "CE", "Otro"])
+    numero_documento = c2.text_input("Número de documento")
+    razon_social = c3.text_input("Razón social o nombre *")
+    c1, c2, c3 = st.columns(3)
+    contacto = c1.text_input("Persona de contacto")
+    telefono = c2.text_input("Teléfono")
+    correo = c3.text_input("Correo")
+    direccion = st.text_input("Dirección")
+    datos_cliente = {
+        "tipo_documento": tipo_documento, "numero_documento": numero_documento,
+        "razon_social": razon_social, "contacto": contacto, "telefono": telefono,
+        "correo": correo, "direccion": direccion,
+    }
 
-    st.divider()
-    st.subheader("2. Datos técnicos del sistema")
-    proyecto = st.text_input("Proyecto o referencia *")
-    tipo_tablero = st.selectbox("Tipo de tablero", TIPOS_TABLERO)
+st.divider()
+st.subheader("2. Datos técnicos del sistema")
+proyecto = st.text_input("Proyecto o referencia *")
+tipo_tablero = st.selectbox("Tipo de tablero", TIPOS_TABLERO)
+
+if tipo_tablero == "Contraincendio":
+    c1, c2, c3, c4 = st.columns(4)
+    potencia_hp = c1.number_input(
+        "Potencia de bomba principal (HP)", min_value=0.1, value=20.0, step=0.5
+    )
+    corriente_motor = c2.number_input(
+        "Corriente de bomba principal (A)", min_value=0.1, value=50.0, step=0.1
+    )
+    potencia_jockey_hp = c3.number_input(
+        "Potencia de bomba jockey (HP)", min_value=0.1, value=2.0, step=0.5
+    )
+    corriente_jockey = c4.number_input(
+        "Corriente de bomba jockey (A)", min_value=0.1, value=6.0, step=0.1
+    )
+    c1, c2, c3 = st.columns(3)
+    tension = c1.selectbox("Tensión de trabajo (V)", [220, 380, 440])
+    altitud_msnm = c2.number_input(
+        "Altitud de operación (msnm)", min_value=0, value=0, step=100
+    )
+    tipo_control = c3.selectbox(
+        "Estrategia de control", ["Estrella-triángulo", "Softstarter"]
+    )
+    cantidad_bombas = 2
+    fases = 3
+    presion_trabajo = 1.0
+    unidad_presion = "bar"
+    sistema_alarma = "Sin alarma"
+else:
     c1, c2, c3, c4 = st.columns(4)
     cantidad_bombas = c1.number_input("Cantidad total de bombas", min_value=1, value=2, step=1)
     potencia_hp = c2.number_input("Potencia por bomba (HP)", min_value=0.1, value=5.0, step=0.5)
@@ -74,8 +102,11 @@ with st.form("formulario_cotizacion", clear_on_submit=False):
     sistema_alarma = c2.selectbox(
         "Sistema de alarma", ["Sin alarma", "Con alarma"]
     )
-    observaciones = st.text_area("Observaciones técnicas")
-    guardar = st.form_submit_button("Guardar borrador de cotización", type="primary")
+    potencia_jockey_hp = 0.0
+    corriente_jockey = 0.0
+
+observaciones = st.text_area("Observaciones técnicas")
+guardar = st.button("Guardar borrador de cotización", type="primary")
 
 if guardar:
     if not proyecto.strip():
@@ -90,6 +121,8 @@ if guardar:
                 "proyecto": proyecto, "tipo_tablero": tipo_tablero,
                 "cantidad_bombas": int(cantidad_bombas),
                 "potencia_hp": float(potencia_hp), "corriente_motor": float(corriente_motor),
+                "potencia_jockey_hp": float(potencia_jockey_hp),
+                "corriente_jockey": float(corriente_jockey),
                 "altitud_msnm": float(altitud_msnm),
                 "tension": int(tension), "fases": int(fases), "tipo_control": tipo_control,
                 "presion_trabajo": float(presion_trabajo), "unidad_presion": unidad_presion,
