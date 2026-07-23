@@ -88,14 +88,15 @@ def registrar_cotizacion(cliente_id, datos):
             """INSERT INTO cotizaciones (
             numero, cliente_id, proyecto, cantidad_bombas, bombas_operacion,
             bombas_reserva, potencia_hp, corriente_motor, tension, fases,
-            tipo_control, presion_trabajo, unidad_presion, senal_sensor,
+            tipo_control, presion_trabajo, unidad_presion, con_alarma,
             observaciones, altitud_msnm, estado)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Borrador')""",
             (numero, cliente_id, datos["proyecto"].strip(), datos["cantidad_bombas"],
              datos["cantidad_bombas"], 0, datos["potencia_hp"],
              datos["corriente_motor"], datos["tension"], datos["fases"],
              datos["tipo_control"], datos["presion_trabajo"], datos["unidad_presion"],
-             datos["senal_sensor"], datos.get("observaciones", "").strip(),
+             int(bool(datos.get("con_alarma", False))),
+             datos.get("observaciones", "").strip(),
              datos.get("altitud_msnm", 0)),
         )
         conexion.commit()
@@ -114,7 +115,8 @@ def obtener_cotizaciones():
             """SELECT c.id, c.numero, cl.razon_social AS cliente, c.proyecto,
             c.cantidad_bombas, c.potencia_hp, c.corriente_motor,
             c.altitud_msnm, c.tension, c.tipo_control,
-            c.presion_trabajo, c.unidad_presion, c.estado, c.fecha_creacion
+            c.presion_trabajo, c.unidad_presion, c.con_alarma,
+            c.estado, c.fecha_creacion
             FROM cotizaciones c JOIN clientes cl ON cl.id = c.cliente_id
             ORDER BY c.id DESC""",
             conexion,
