@@ -71,8 +71,11 @@ with st.form("seleccion_componentes"):
         filas = {}
         for fila in candidatos.itertuples():
             estado_stock = "Disponible" if fila.stock >= requerimiento["cantidad"] else "Stock insuficiente"
-            rango = extraer_rango_corriente(
-                f"{fila.descripcion} {fila.modelo or ''}"
+            corriente_catalogo = float(fila.corriente_nominal or 0)
+            rango = (
+                (corriente_catalogo, corriente_catalogo)
+                if corriente_catalogo > 0
+                else extraer_rango_corriente(f"{fila.descripcion} {fila.modelo or ''}")
             )
             capacidad = ""
             if rango:
