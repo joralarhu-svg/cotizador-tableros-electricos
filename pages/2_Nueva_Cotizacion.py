@@ -1,7 +1,12 @@
 import streamlit as st
 
 from database.init_db import inicializar_base_datos
-from modules.cotizaciones import obtener_clientes, registrar_cliente, registrar_cotizacion
+from modules.cotizaciones import (
+    TIPOS_TABLERO,
+    obtener_clientes,
+    registrar_cliente,
+    registrar_cotizacion,
+)
 
 
 inicializar_base_datos()
@@ -44,6 +49,7 @@ with st.form("formulario_cotizacion", clear_on_submit=False):
     st.divider()
     st.subheader("2. Datos técnicos del sistema")
     proyecto = st.text_input("Proyecto o referencia *")
+    tipo_tablero = st.selectbox("Tipo de tablero", TIPOS_TABLERO)
     c1, c2, c3, c4 = st.columns(4)
     cantidad_bombas = c1.number_input("Cantidad total de bombas", min_value=1, value=2, step=1)
     potencia_hp = c2.number_input("Potencia por bomba (HP)", min_value=0.1, value=5.0, step=0.5)
@@ -81,7 +87,8 @@ if guardar:
             if cliente_id is None:
                 cliente_id = registrar_cliente(datos_cliente)
             resultado = registrar_cotizacion(cliente_id, {
-                "proyecto": proyecto, "cantidad_bombas": int(cantidad_bombas),
+                "proyecto": proyecto, "tipo_tablero": tipo_tablero,
+                "cantidad_bombas": int(cantidad_bombas),
                 "potencia_hp": float(potencia_hp), "corriente_motor": float(corriente_motor),
                 "altitud_msnm": float(altitud_msnm),
                 "tension": int(tension), "fases": int(fases), "tipo_control": tipo_control,
