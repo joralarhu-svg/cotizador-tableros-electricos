@@ -25,8 +25,9 @@ class SeleccionComponentesTest(unittest.TestCase):
         })
         return registrar_cotizacion(cliente, {
             "proyecto": "Presión constante", "cantidad_bombas": 2,
-            "bombas_operacion": 1, "bombas_reserva": 1, "potencia_hp": 5.0,
+            "potencia_hp": 5.0,
             "corriente_motor": 14.0, "tension": 220, "fases": 3,
+            "altitud_msnm": 2000,
             "tipo_control": "Un variador por bomba", "presion_trabajo": 4.0,
             "unidad_presion": "bar", "senal_sensor": "4-20 mA", "observaciones": "",
         })
@@ -35,11 +36,25 @@ class SeleccionComponentesTest(unittest.TestCase):
         from modules.seleccion_componentes import generar_requerimientos
         cotizacion = {
             "cantidad_bombas": 2, "tipo_control": "Un variador por bomba",
-            "potencia_hp": 5.0, "tension": 220, "senal_sensor": "4-20 mA",
+            "potencia_hp": 5.0, "corriente_motor": 14.0,
+            "altitud_msnm": 2000, "tension": 220, "senal_sensor": "4-20 mA",
         }
         requerimientos = generar_requerimientos(cotizacion)
         self.assertEqual(requerimientos[0]["cantidad"], 2)
         self.assertIn("Variadores", requerimientos[0]["grupo"])
+        self.assertAlmostEqual(requerimientos[0]["corriente_requerida"], 15.4)
+
+    def test_calcula_derrateo_y_extrae_corriente(self):
+        from modules.seleccion_componentes import (
+            calcular_corriente_corregida,
+            calcular_factor_derrateo,
+            extraer_rango_corriente,
+        )
+        self.assertEqual(calcular_factor_derrateo(1000), 1.0)
+        self.assertAlmostEqual(calcular_factor_derrateo(2500), 1.15)
+        self.assertAlmostEqual(calcular_corriente_corregida(20, 2500), 23.0)
+        self.assertEqual(extraer_rango_corriente("Guardamotor 18-25 A"), (18.0, 25.0))
+        self.assertEqual(extraer_rango_corriente("Contactor AC-3 32A"), (32.0, 32.0))
 
     def test_busca_y_guarda_componente(self):
         from modules.inventario import guardar_componentes
@@ -48,7 +63,7 @@ class SeleccionComponentesTest(unittest.TestCase):
             obtener_cotizacion, obtener_detalle_cotizacion,
         )
         guardar_componentes(pd.DataFrame([{
-            "codigo": "VDF-5HP", "descripcion": "Variador de frecuencia 5 HP 220V",
+            "codigo": "VDF-5HP", "descripcion": "Variador de frecuencia 5 HP 18A 220V",
             "categoria": "Variadores", "marca": "WEG", "modelo": "CFW500",
             "unidad": "und", "stock": 2, "stock_minimo": 1,
             "costo_unitario": 850.0, "moneda": "PEN", "proveedor": "",
@@ -67,6 +82,34 @@ class SeleccionComponentesTest(unittest.TestCase):
         self.assertTrue(resultado["correcto"])
         detalle = obtener_detalle_cotizacion(creada["id"])
         self.assertEqual(detalle.iloc[0]["precio_unitario"], 1062.5)
+
+    def test_descarta_componente_con_corriente_insuficiente(self):
+        from modules.inventario import guardar_componentes
+        from modules.seleccion_componentes import (
+            buscar_candidatos, generar_requerimientos, obtener_cotizacion,
+        )
+        guardar_componentes(pd.DataFrame([
+            {
+                "codigo": "VDF-12A", "descripcion": "Variador 5 HP 12A 220V",
+                "categoria": "Variadores", "marca": "A", "modelo": "",
+                "unidad": "und", "stock": 5, "stock_minimo": 0,
+                "costo_unitario": 500, "moneda": "PEN", "proveedor": "",
+                "ubicacion": "", "estado": "Activo", "observaciones": "",
+            },
+            {
+                "codigo": "VDF-18A", "descripcion": "Variador 5 HP 18A 220V",
+                "categoria": "Variadores", "marca": "B", "modelo": "",
+                "unidad": "und", "stock": 5, "stock_minimo": 0,
+                "costo_unitario": 600, "moneda": "PEN", "proveedor": "",
+                "ubicacion": "", "estado": "Activo", "observaciones": "",
+            },
+        ]))
+        creada = self._crear_cotizacion()
+        cotizacion = obtener_cotizacion(creada["id"])
+        candidatos = buscar_candidatos(
+            generar_requerimientos(cotizacion)[0], cotizacion
+        )
+        self.assertEqual(candidatos["codigo"].tolist(), ["VDF-18A"])
 
 
 if __name__ == "__main__":
