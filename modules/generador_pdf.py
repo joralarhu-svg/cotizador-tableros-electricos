@@ -15,6 +15,10 @@ from reportlab.platypus import (
 )
 
 from modules.db import obtener_conexion
+from modules.seleccion_componentes import (
+    calcular_corriente_corregida,
+    calcular_factor_derrateo,
+)
 
 
 AZUL = colors.HexColor("#17365D")
@@ -195,10 +199,16 @@ def generar_pdf_cotizacion(cotizacion_id):
     ]))
     historia.extend([tabla_cliente, Paragraph("ESPECIFICACIÓN DEL SISTEMA", subtitulo)])
 
+    factor_derrateo = calcular_factor_derrateo(cot["altitud_msnm"])
+    corriente_corregida = calcular_corriente_corregida(
+        cot["corriente_motor"], cot["altitud_msnm"]
+    )
     especificacion = (
-        f"Tablero para sistema de presión constante con {cot['cantidad_bombas']} bomba(s), "
-        f"{cot['bombas_operacion']} en operación y {cot['bombas_reserva']} en reserva. "
-        f"Motores de {cot['potencia_hp']:g} HP, {cot['tension']} V, {cot['fases']} fase(s). "
+        f"Tablero para sistema de presión constante con {cot['cantidad_bombas']} bomba(s) "
+        f"disponibles para operación alternada. Motores de {cot['potencia_hp']:g} HP, "
+        f"{cot['corriente_motor']:g} A, {cot['tension']} V, {cot['fases']} fase(s). "
+        f"Altitud: {cot['altitud_msnm']:g} msnm; factor de derrateo {factor_derrateo:.3f}; "
+        f"corriente corregida por bomba {corriente_corregida:.2f} A. "
         f"Control: {cot['tipo_control']}. Presión de trabajo: "
         f"{cot['presion_trabajo']:g} {cot['unidad_presion']}; sensor {cot['senal_sensor']}."
     )
@@ -220,14 +230,17 @@ def generar_pdf_cotizacion(cotizacion_id):
             _texto(_dinero(precio_pen), derecha), _texto(_dinero(fila["subtotal_pen"]), derecha),
         ])
         indice += 1
-    for fila in datos["adicionales"]:
-        if float(fila["subtotal"]) <= 0:
-            continue
+    total_integracion = sum(
+        float(fila["subtotal"]) for fila in datos["adicionales"]
+        if float(fila["subtotal"]) > 0
+    )
+    if total_integracion > 0:
         filas.append([
-            _texto(indice, centro), _texto("SERV", pequeno), _texto(fila["descripcion"], pequeno),
-            _texto(f"{float(fila['cantidad']):g}", centro),
-            _texto(_dinero(fila["precio_unitario"]), derecha),
-            _texto(_dinero(fila["subtotal"]), derecha),
+            _texto(indice, centro), _texto("INT", pequeno),
+            _texto("Integración del tablero eléctrico", pequeno),
+            _texto("1", centro),
+            _texto(_dinero(total_integracion), derecha),
+            _texto(_dinero(total_integracion), derecha),
         ])
         indice += 1
     tabla_detalle = Table(filas, colWidths=[10*mm, 23*mm, 72*mm, 13*mm, 22*mm, 22*mm], repeatRows=1)
