@@ -44,7 +44,8 @@ class GeneradorPdfTest(unittest.TestCase):
             "corriente_motor": 14, "tension": 220, "fases": 3,
             "altitud_msnm": 2500,
             "tipo_control": "Un variador por bomba", "presion_trabajo": 50,
-            "unidad_presion": "psi", "senal_sensor": "4-20 mA", "observaciones": "",
+            "unidad_presion": "psi", "con_alarma": True,
+            "observaciones": "",
         })
         conexion = obtener_conexion()
         componente_id = conexion.execute("SELECT id FROM componentes").fetchone()["id"]
@@ -75,6 +76,8 @@ class GeneradorPdfTest(unittest.TestCase):
             texto = "\n".join(pagina.extract_text() or "" for pagina in documento.pages)
         self.assertIn("Integración del tablero eléctrico", texto)
         self.assertNotIn("Ingeniería y programación", texto)
+        self.assertIn("Sistema de alarma: incluido", texto)
+        self.assertNotIn("4-20 mA", texto)
 
 
 if __name__ == "__main__":
