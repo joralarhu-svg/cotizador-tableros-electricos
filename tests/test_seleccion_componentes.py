@@ -53,6 +53,20 @@ class SeleccionComponentesTest(unittest.TestCase):
             "proteccion_circuito_derivado",
         )
         self.assertEqual(requerimientos[2]["polos_requeridos"], 3)
+        accesorios = {
+            item["grupo"]: item["cantidad"]
+            for item in requerimientos
+            if item["grupo"].startswith("Accesorios de puerta")
+        }
+        self.assertEqual(
+            accesorios,
+            {
+                "Accesorios de puerta - Conmutadores": 2,
+                "Accesorios de puerta - Pilotos verdes": 2,
+                "Accesorios de puerta - Pilotos rojos": 4,
+                "Accesorios de puerta - Piloto ámbar": 1,
+            },
+        )
 
     def test_calcula_derrateo_y_extrae_corriente(self):
         from modules.seleccion_componentes import (
@@ -359,6 +373,68 @@ class SeleccionComponentesTest(unittest.TestCase):
         )
         candidatos = buscar_candidatos(requerimiento, cotizacion)
         self.assertEqual(candidatos["codigo"].tolist(), ["TM-3P"])
+
+    def test_accesorios_puerta_filtra_tipo_y_color(self):
+        from modules.inventario import guardar_componentes
+        from modules.seleccion_componentes import (
+            buscar_candidatos, generar_requerimientos, obtener_cotizacion,
+        )
+        base = {
+            "unidad": "und", "stock": 10, "stock_minimo": 0,
+            "costo_unitario": 20, "corriente_nominal": 0,
+            "moneda": "PEN", "proveedor": "", "ubicacion": "",
+            "estado": "Activo", "observaciones": "", "marca": "Prueba",
+            "categoria": "Mando y señalización",
+        }
+        guardar_componentes(pd.DataFrame([
+            {
+                **base, "codigo": "SEL-MOA",
+                "descripcion": "Selector Man-0-Aut, 1 Polo, 16A",
+                "modelo": "SEL1",
+            },
+            {
+                **base, "codigo": "PIL-VERDE",
+                "descripcion": "Piloto de señalizacion PVC verde 22mm 220VAC",
+                "modelo": "PV",
+            },
+            {
+                **base, "codigo": "PIL-ROJO",
+                "descripcion": "Piloto de señalizacion PVC rojo 22mm 220VAC",
+                "modelo": "PR",
+            },
+            {
+                **base, "codigo": "PIL-AMARILLO",
+                "descripcion": "Piloto de señalizacion PVC amarilla 22mm 220VAC",
+                "modelo": "PA",
+            },
+            {
+                **base, "codigo": "PUL-ROJO",
+                "descripcion": "Pulsador rasante metal rojo 22mm",
+                "modelo": "BR",
+            },
+            {
+                **base, "codigo": "CAB-ROJO",
+                "descripcion": "Cabezal piloto rojo",
+                "modelo": "CR",
+            },
+        ]))
+        creada = self._crear_cotizacion()
+        cotizacion = obtener_cotizacion(creada["id"])
+        requerimientos = {
+            item["grupo"]: item
+            for item in generar_requerimientos(cotizacion)
+        }
+        esperados = {
+            "Accesorios de puerta - Conmutadores": ["SEL-MOA"],
+            "Accesorios de puerta - Pilotos verdes": ["PIL-VERDE"],
+            "Accesorios de puerta - Pilotos rojos": ["PIL-ROJO"],
+            "Accesorios de puerta - Piloto ámbar": ["PIL-AMARILLO"],
+        }
+        for grupo, codigos in esperados.items():
+            candidatos = buscar_candidatos(
+                requerimientos[grupo], cotizacion
+            )
+            self.assertEqual(candidatos["codigo"].tolist(), codigos)
 
 
 if __name__ == "__main__":
