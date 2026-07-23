@@ -771,6 +771,23 @@ class SeleccionComponentesTest(unittest.TestCase):
         for grupo, cantidad in cantidades.items():
             self.assertEqual(requerimientos[grupo]["cantidad"], cantidad)
 
+    def test_contraincendio_estrella_triangulo_espera_reglas_especificas(self):
+        from modules.seleccion_componentes import generar_requerimientos
+
+        cotizacion = {
+            "tipo_tablero": "Contraincendio",
+            "tipo_control": "Estrella-triángulo",
+            "potencia_hp": 15,
+            "corriente_motor": 30,
+            "potencia_jockey_hp": 3,
+            "corriente_jockey": 8,
+            "altitud_msnm": 0,
+            "tension": 220,
+            "fases": 3,
+            "cantidad_bombas": 2,
+        }
+        self.assertEqual(generar_requerimientos(cotizacion), [])
+
 
 if __name__ == "__main__":
     unittest.main()
