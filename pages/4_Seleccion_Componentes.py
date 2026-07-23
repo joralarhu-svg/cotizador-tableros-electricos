@@ -91,12 +91,12 @@ with st.form("seleccion_componentes"):
         st.divider()
 
     confirmar = st.checkbox("Confirmo que revisé técnicamente los componentes seleccionados.")
-    guardar = st.form_submit_button(
-        "Guardar selección", type="primary", disabled=not confirmar
-    )
+    guardar = st.form_submit_button("Guardar selección", type="primary")
 
 if guardar:
-    if not selecciones:
+    if not confirmar:
+        st.error("Confirme la revisión técnica antes de guardar la selección.")
+    elif not selecciones:
         st.error("Seleccione por lo menos un componente.")
     else:
         resultado = guardar_seleccion(cotizacion_id, selecciones)
