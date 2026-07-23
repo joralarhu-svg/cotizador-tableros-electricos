@@ -35,12 +35,26 @@ etiqueta = st.selectbox("Seleccione la cotización", opciones.keys())
 cotizacion_id = opciones[etiqueta]
 cotizacion = obtener_cotizacion(cotizacion_id)
 
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Bombas", cotizacion["cantidad_bombas"])
-c2.metric("Potencia por bomba", f"{cotizacion['potencia_hp']:g} HP")
-c3.metric("Corriente nominal", f"{cotizacion['corriente_motor']:g} A")
-c4.metric("Altitud", f"{cotizacion['altitud_msnm']:g} msnm")
-c5.metric("Tensión", f"{cotizacion['tension']} V")
+if cotizacion.get("tipo_tablero") == "Contraincendio":
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(
+        "Bomba principal",
+        f"{cotizacion['potencia_hp']:g} HP · {cotizacion['corriente_motor']:g} A",
+    )
+    c2.metric(
+        "Bomba jockey",
+        f"{cotizacion.get('potencia_jockey_hp', 0):g} HP · "
+        f"{cotizacion.get('corriente_jockey', 0):g} A",
+    )
+    c3.metric("Altitud", f"{cotizacion['altitud_msnm']:g} msnm")
+    c4.metric("Tensión", f"{cotizacion['tension']} V")
+else:
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Bombas", cotizacion["cantidad_bombas"])
+    c2.metric("Potencia por bomba", f"{cotizacion['potencia_hp']:g} HP")
+    c3.metric("Corriente nominal", f"{cotizacion['corriente_motor']:g} A")
+    c4.metric("Altitud", f"{cotizacion['altitud_msnm']:g} msnm")
+    c5.metric("Tensión", f"{cotizacion['tension']} V")
 factor_derrateo = calcular_factor_derrateo(cotizacion["altitud_msnm"])
 corriente_corregida = calcular_corriente_corregida(
     cotizacion["corriente_motor"], cotizacion["altitud_msnm"]
@@ -54,6 +68,13 @@ st.caption(
     f"Tablero: {cotizacion.get('tipo_tablero', 'Presión constante')} · "
     f"Control: {cotizacion['tipo_control']} · {alarma}"
 )
+
+if cotizacion.get("tipo_tablero") == "Contraincendio":
+    st.info(
+        "Los datos contraincendio están registrados. La selección automática de "
+        "componentes se habilitará cuando se definan sus reglas técnicas específicas."
+    )
+    st.stop()
 
 requerimientos = generar_requerimientos(cotizacion)
 selecciones = []
