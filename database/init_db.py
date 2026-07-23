@@ -75,6 +75,10 @@ def crear_tablas_cotizaciones():
                 bombas_reserva INTEGER NOT NULL DEFAULT 0 CHECK (bombas_reserva >= 0),
                 potencia_hp REAL NOT NULL CHECK (potencia_hp > 0),
                 corriente_motor REAL NOT NULL CHECK (corriente_motor > 0),
+                potencia_jockey_hp REAL NOT NULL DEFAULT 0
+                    CHECK (potencia_jockey_hp >= 0),
+                corriente_jockey REAL NOT NULL DEFAULT 0
+                    CHECK (corriente_jockey >= 0),
                 tension INTEGER NOT NULL CHECK (tension IN (220, 380, 440)),
                 fases INTEGER NOT NULL DEFAULT 3 CHECK (fases IN (1, 3)),
                 tipo_control TEXT NOT NULL,
@@ -120,6 +124,8 @@ def crear_estructura_comercial():
         }
         nuevas_columnas = {
             "tipo_tablero": "TEXT NOT NULL DEFAULT 'Presión constante'",
+            "potencia_jockey_hp": "REAL NOT NULL DEFAULT 0",
+            "corriente_jockey": "REAL NOT NULL DEFAULT 0",
             "altitud_msnm": "REAL NOT NULL DEFAULT 0",
             "con_alarma": "INTEGER NOT NULL DEFAULT 0",
             "tipo_cambio": "REAL NOT NULL DEFAULT 3.50",
