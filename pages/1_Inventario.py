@@ -73,7 +73,8 @@ with tab_actualizar:
         if categoria != "Todas":
             filtrado = filtrado[filtrado["categoria"] == categoria]
         columnas = ["id", "codigo", "descripcion", "stock", "stock_minimo",
-                    "costo_unitario", "proveedor", "ubicacion", "estado", "observaciones"]
+                    "costo_unitario", "corriente_nominal", "proveedor",
+                    "ubicacion", "estado", "observaciones"]
         editado = st.data_editor(
             filtrado[columnas], use_container_width=True, hide_index=True,
             disabled=["id", "codigo", "descripcion"],
@@ -82,6 +83,10 @@ with tab_actualizar:
                 "stock": st.column_config.NumberColumn("Stock", min_value=0, step=1, format="%d"),
                 "stock_minimo": st.column_config.NumberColumn("Stock mínimo", min_value=0, step=1, format="%d"),
                 "costo_unitario": st.column_config.NumberColumn("Costo", min_value=0.0, step=0.01, format="%.2f"),
+                "corriente_nominal": st.column_config.NumberColumn(
+                    "Corriente nominal (A)", min_value=0.0, step=0.1, format="%.2f A",
+                    help="Use 0 cuando la corriente no aplique al componente."
+                ),
                 "estado": st.column_config.SelectboxColumn(
                     "Estado", options=["Activo", "Inactivo", "Descontinuado"], required=True
                 ),
@@ -118,4 +123,3 @@ with tab_consultar:
             filtrado = filtrado[filtrado["estado"] == estado]
         st.write(f"Resultados: **{len(filtrado)}**")
         st.dataframe(filtrado.drop(columns=["id"]), use_container_width=True, hide_index=True)
-
