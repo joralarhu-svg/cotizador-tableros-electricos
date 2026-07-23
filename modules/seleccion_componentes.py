@@ -5,6 +5,32 @@ import pandas as pd
 from modules.db import obtener_conexion
 
 
+def calcular_factor_derrateo(altitud_msnm):
+    altitud = max(0.0, float(altitud_msnm or 0))
+    exceso = max(0.0, altitud - 1000.0)
+    return 1.0 + (exceso / 100.0) * 0.01
+
+
+def calcular_corriente_corregida(corriente_motor, altitud_msnm):
+    return float(corriente_motor) * calcular_factor_derrateo(altitud_msnm)
+
+
+def extraer_rango_corriente(texto):
+    texto = _normalizar(texto).replace(",", ".")
+    rango = re.search(
+        r"(\d+(?:\.\d+)?)\s*(?:-|a|hasta)\s*(\d+(?:\.\d+)?)\s*a\b",
+        texto,
+    )
+    if rango:
+        minimo, maximo = float(rango.group(1)), float(rango.group(2))
+        return (min(minimo, maximo), max(minimo, maximo))
+    valores = re.findall(r"(\d+(?:\.\d+)?)\s*a\b", texto)
+    if valores:
+        capacidad = max(float(valor) for valor in valores)
+        return (capacidad, capacidad)
+    return None
+
+
 def obtener_cotizacion(cotizacion_id):
     conexion = obtener_conexion()
     try:
@@ -23,41 +49,52 @@ def obtener_cotizacion(cotizacion_id):
 def generar_requerimientos(cotizacion):
     total = int(cotizacion["cantidad_bombas"])
     tipo_control = cotizacion["tipo_control"]
+    corriente_bomba = calcular_corriente_corregida(
+        cotizacion["corriente_motor"], cotizacion.get("altitud_msnm", 0)
+    )
     requerimientos = [
         {
             "grupo": "Protección general",
             "cantidad": 1,
             "palabras": ["interruptor termomagnetico", "interruptor caja moldeada"],
+            "corriente_requerida": corriente_bomba * total,
+            "criterio_corriente": "minima",
             "nota": "Protección principal del tablero; verificar poder de corte y corriente total.",
         },
         {
             "grupo": "Protección de motores",
             "cantidad": total,
             "palabras": ["guarda motor", "guardamotor", "rele termico"],
+            "corriente_requerida": corriente_bomba,
+            "criterio_corriente": "rango",
             "nota": "Una protección por motor; confirmar rango con la corriente nominal.",
         },
         {
             "grupo": "Control automático",
             "cantidad": 1,
             "palabras": ["plc", "rele programable", "controlador"],
+            "criterio_corriente": None,
             "nota": "Control de alternancia, presión, alarmas y secuencia de bombas.",
         },
         {
             "grupo": "Transmisor de presión",
             "cantidad": 1,
             "palabras": ["transmisor de presion", "sensor de presion", "presostato"],
+            "criterio_corriente": None,
             "nota": f"Señal requerida: {cotizacion['senal_sensor']}.",
         },
         {
             "grupo": "Fuente o transformador de control",
             "cantidad": 1,
             "palabras": ["fuente de alimentacion", "transformador"],
+            "criterio_corriente": None,
             "nota": "Alimentación para PLC, sensores y elementos de mando.",
         },
         {
             "grupo": "Gabinete",
             "cantidad": 1,
             "palabras": ["gabinete", "tablero"],
+            "criterio_corriente": None,
             "nota": "Dimensionar después de confirmar equipos, ventilación y reserva física.",
         },
     ]
@@ -67,19 +104,31 @@ def generar_requerimientos(cotizacion):
             "grupo": "Variadores de frecuencia",
             "cantidad": total,
             "palabras": ["variador"],
-            "nota": f"Un variador por bomba, {cotizacion['potencia_hp']:g} HP, {cotizacion['tension']} V.",
+            "corriente_requerida": corriente_bomba,
+            "criterio_corriente": "minima",
+            "nota": (
+                f"Un variador por bomba, mínimo {corriente_bomba:.2f} A después "
+                f"del derrateo, {cotizacion['tension']} V."
+            ),
         })
     elif tipo_control == "Un variador compartido":
         requerimientos.insert(0, {
             "grupo": "Variador de frecuencia",
             "cantidad": 1,
             "palabras": ["variador"],
-            "nota": f"Variador compartido, {cotizacion['potencia_hp']:g} HP, {cotizacion['tension']} V.",
+            "corriente_requerida": corriente_bomba,
+            "criterio_corriente": "minima",
+            "nota": (
+                f"Variador compartido, mínimo {corriente_bomba:.2f} A después "
+                f"del derrateo, {cotizacion['tension']} V."
+            ),
         })
         requerimientos.insert(2, {
             "grupo": "Contactores de transferencia",
             "cantidad": total,
             "palabras": ["contactor"],
+            "corriente_requerida": corriente_bomba,
+            "criterio_corriente": "minima",
             "nota": "Transferencia entre motores con enclavamiento eléctrico y mecánico.",
         })
     elif tipo_control == "Arranque directo":
@@ -87,6 +136,8 @@ def generar_requerimientos(cotizacion):
             "grupo": "Contactores de potencia",
             "cantidad": total,
             "palabras": ["contactor"],
+            "corriente_requerida": corriente_bomba,
+            "criterio_corriente": "minima",
             "nota": "Un contactor por bomba; seleccionar categoría AC-3.",
         })
     elif tipo_control == "Estrella-triángulo":
@@ -94,12 +145,15 @@ def generar_requerimientos(cotizacion):
             "grupo": "Contactores estrella-triángulo",
             "cantidad": total * 3,
             "palabras": ["contactor"],
+            "corriente_requerida": corriente_bomba,
+            "criterio_corriente": "minima",
             "nota": "Tres contactores por motor; validar calibres de línea, estrella y triángulo.",
         })
         requerimientos.insert(1, {
             "grupo": "Temporizadores estrella-triángulo",
             "cantidad": total,
             "palabras": ["temporizador estrella", "temporizador"],
+            "criterio_corriente": None,
             "nota": "Un temporizador por arrancador estrella-triángulo.",
         })
 
@@ -155,6 +209,28 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
 
     componentes["puntaje"] = componentes.apply(puntuar, axis=1)
     candidatos = componentes[componentes["puntaje"] > 0].copy()
+    criterio = requerimiento.get("criterio_corriente")
+    corriente_requerida = requerimiento.get("corriente_requerida")
+    if criterio and corriente_requerida is not None:
+        candidatos["rango_corriente"] = candidatos.apply(
+            lambda fila: extraer_rango_corriente(
+                f"{fila['descripcion']} {fila['modelo']}"
+            ),
+            axis=1,
+        )
+        candidatos = candidatos[candidatos["rango_corriente"].notna()].copy()
+        if criterio == "rango":
+            candidatos = candidatos[
+                candidatos["rango_corriente"].map(
+                    lambda rango: rango[0] <= corriente_requerida <= rango[1]
+                )
+            ]
+        else:
+            candidatos = candidatos[
+                candidatos["rango_corriente"].map(
+                    lambda rango: rango[1] >= corriente_requerida
+                )
+            ]
     return candidatos.sort_values(
         ["puntaje", "stock", "descripcion"], ascending=[False, False, True]
     ).head(limite).reset_index(drop=True)
@@ -212,4 +288,3 @@ def obtener_detalle_cotizacion(cotizacion_id):
         )
     finally:
         conexion.close()
-
