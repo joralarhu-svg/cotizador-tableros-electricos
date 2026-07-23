@@ -63,6 +63,60 @@ class CotizacionesTest(unittest.TestCase):
         })
         self.assertIn("El tipo de tablero seleccionado no es válido.", errores)
 
+    def test_contraincendio_guarda_bomba_principal_y_jockey(self):
+        from modules.cotizaciones import (
+            obtener_cotizaciones,
+            registrar_cliente,
+            registrar_cotizacion,
+        )
+
+        cliente_id = registrar_cliente({
+            "tipo_documento": "RUC",
+            "numero_documento": "20987654321",
+            "razon_social": "Cliente contraincendio",
+        })
+        resultado = registrar_cotizacion(cliente_id, {
+            "proyecto": "Sala de bombas",
+            "tipo_tablero": "Contraincendio",
+            "cantidad_bombas": 2,
+            "potencia_hp": 40,
+            "corriente_motor": 105,
+            "potencia_jockey_hp": 3,
+            "corriente_jockey": 8,
+            "tension": 220,
+            "fases": 3,
+            "altitud_msnm": 500,
+            "tipo_control": "Estrella-triángulo",
+            "presion_trabajo": 1,
+            "unidad_presion": "bar",
+        })
+        self.assertTrue(resultado["correcto"])
+        cotizacion = obtener_cotizaciones().iloc[0]
+        self.assertEqual(cotizacion["potencia_hp"], 40)
+        self.assertEqual(cotizacion["corriente_motor"], 105)
+        self.assertEqual(cotizacion["potencia_jockey_hp"], 3)
+        self.assertEqual(cotizacion["corriente_jockey"], 8)
+
+    def test_contraincendio_rechaza_variador_y_datos_jockey_vacios(self):
+        from modules.cotizaciones import validar_datos_tecnicos
+
+        errores = validar_datos_tecnicos({
+            "tipo_tablero": "Contraincendio",
+            "cantidad_bombas": 2,
+            "potencia_hp": 40,
+            "corriente_motor": 105,
+            "potencia_jockey_hp": 0,
+            "corriente_jockey": 0,
+            "altitud_msnm": 0,
+            "tipo_control": "Un variador por bomba",
+            "presion_trabajo": 1,
+        })
+        self.assertIn(
+            "La potencia y la corriente de la bomba jockey deben ser mayores que cero.",
+            errores,
+        )
+        self.assertTrue(any("solo admite control" in error for error in errores))
+
     def test_eliminar_cotizacion_borra_relaciones_y_conserva_cliente(self):
         from modules.cotizaciones import (
             eliminar_cotizaciones,
