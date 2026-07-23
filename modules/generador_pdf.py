@@ -210,7 +210,9 @@ def generar_pdf_cotizacion(cotizacion_id):
         f"Altitud: {cot['altitud_msnm']:g} msnm; factor de derrateo {factor_derrateo:.3f}; "
         f"corriente corregida por bomba {corriente_corregida:.2f} A. "
         f"Control: {cot['tipo_control']}. Presión de trabajo: "
-        f"{cot['presion_trabajo']:g} {cot['unidad_presion']}; sensor {cot['senal_sensor']}."
+        f"{cot['presion_trabajo']:g} {cot['unidad_presion']}. "
+        f"Sistema de alarma: "
+        f"{'incluido' if cot.get('con_alarma', 0) else 'no incluido'}."
     )
     historia.extend([Paragraph(especificacion, normal), Paragraph("DETALLE ECONÓMICO", subtitulo)])
 
