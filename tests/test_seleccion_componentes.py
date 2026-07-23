@@ -55,6 +55,10 @@ class SeleccionComponentesTest(unittest.TestCase):
         self.assertAlmostEqual(calcular_corriente_corregida(20, 2500), 23.0)
         self.assertEqual(extraer_rango_corriente("Guardamotor 18-25 A"), (18.0, 25.0))
         self.assertEqual(extraer_rango_corriente("Contactor AC-3 32A"), (32.0, 32.0))
+        self.assertEqual(
+            extraer_rango_corriente("Soft Starter 208 a 600VAC 45AMP"),
+            (45.0, 45.0),
+        )
 
     def test_busca_y_guarda_componente(self):
         from modules.inventario import guardar_componentes
@@ -66,7 +70,8 @@ class SeleccionComponentesTest(unittest.TestCase):
             "codigo": "VDF-5HP", "descripcion": "Variador de frecuencia 5 HP 18A 220V",
             "categoria": "Variadores", "marca": "WEG", "modelo": "CFW500",
             "unidad": "und", "stock": 2, "stock_minimo": 1,
-            "costo_unitario": 850.0, "moneda": "PEN", "proveedor": "",
+            "costo_unitario": 850.0, "corriente_nominal": 18.0,
+            "moneda": "PEN", "proveedor": "",
             "ubicacion": "", "estado": "Activo", "observaciones": "",
         }]))
         creada = self._crear_cotizacion()
@@ -93,15 +98,25 @@ class SeleccionComponentesTest(unittest.TestCase):
                 "codigo": "VDF-12A", "descripcion": "Variador 5 HP 12A 220V",
                 "categoria": "Variadores", "marca": "A", "modelo": "",
                 "unidad": "und", "stock": 5, "stock_minimo": 0,
-                "costo_unitario": 500, "moneda": "PEN", "proveedor": "",
+                "costo_unitario": 500, "corriente_nominal": 12,
+                "moneda": "PEN", "proveedor": "",
                 "ubicacion": "", "estado": "Activo", "observaciones": "",
             },
             {
                 "codigo": "VDF-18A", "descripcion": "Variador 5 HP 18A 220V",
                 "categoria": "Variadores", "marca": "B", "modelo": "",
                 "unidad": "und", "stock": 5, "stock_minimo": 0,
-                "costo_unitario": 600, "moneda": "PEN", "proveedor": "",
+                "costo_unitario": 600, "corriente_nominal": 18,
+                "moneda": "PEN", "proveedor": "",
                 "ubicacion": "", "estado": "Activo", "observaciones": "",
+            },
+            {
+                "codigo": "VDF-25A", "descripcion": "Variador 5 HP 25A 220V",
+                "categoria": "Variadores", "marca": "C", "modelo": "",
+                "unidad": "und", "stock": 5, "stock_minimo": 0,
+                "costo_unitario": 700, "corriente_nominal": 25,
+                "moneda": "PEN", "proveedor": "", "ubicacion": "",
+                "estado": "Activo", "observaciones": "",
             },
         ]))
         creada = self._crear_cotizacion()
@@ -109,7 +124,8 @@ class SeleccionComponentesTest(unittest.TestCase):
         candidatos = buscar_candidatos(
             generar_requerimientos(cotizacion)[0], cotizacion
         )
-        self.assertEqual(candidatos["codigo"].tolist(), ["VDF-18A"])
+        self.assertEqual(candidatos["codigo"].tolist(), ["VDF-18A", "VDF-25A"])
+        self.assertEqual(candidatos.iloc[0]["corriente_seleccion"], 18)
 
     def test_sin_capacidad_suficiente_devuelve_lista_vacia(self):
         from modules.inventario import guardar_componentes
@@ -120,7 +136,8 @@ class SeleccionComponentesTest(unittest.TestCase):
             "codigo": "VDF-12A", "descripcion": "Variador 5 HP 12A 220V",
             "categoria": "Variadores", "marca": "A", "modelo": "",
             "unidad": "und", "stock": 5, "stock_minimo": 0,
-            "costo_unitario": 500, "moneda": "PEN", "proveedor": "",
+            "costo_unitario": 500, "corriente_nominal": 12,
+            "moneda": "PEN", "proveedor": "",
             "ubicacion": "", "estado": "Activo", "observaciones": "",
         }]))
         creada = self._crear_cotizacion()
