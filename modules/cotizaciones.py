@@ -123,3 +123,43 @@ def obtener_cotizaciones():
         )
     finally:
         conexion.close()
+
+
+def eliminar_cotizaciones(cotizacion_ids):
+    ids = sorted({int(cotizacion_id) for cotizacion_id in cotizacion_ids})
+    if not ids:
+        return {
+            "correcto": False,
+            "eliminadas": 0,
+            "errores": ["Seleccione al menos una cotización para eliminar."],
+        }
+
+    conexion = obtener_conexion()
+    try:
+        marcadores = ",".join("?" for _ in ids)
+        existentes = conexion.execute(
+            f"SELECT COUNT(*) AS total FROM cotizaciones WHERE id IN ({marcadores})",
+            ids,
+        ).fetchone()["total"]
+        if existentes != len(ids):
+            conexion.rollback()
+            return {
+                "correcto": False,
+                "eliminadas": 0,
+                "errores": [
+                    "Una o más cotizaciones seleccionadas ya no existen. "
+                    "Actualice la página e inténtelo nuevamente."
+                ],
+            }
+
+        conexion.execute(
+            f"DELETE FROM cotizaciones WHERE id IN ({marcadores})",
+            ids,
+        )
+        conexion.commit()
+        return {"correcto": True, "eliminadas": len(ids), "errores": []}
+    except Exception as error:
+        conexion.rollback()
+        return {"correcto": False, "eliminadas": 0, "errores": [str(error)]}
+    finally:
+        conexion.close()
