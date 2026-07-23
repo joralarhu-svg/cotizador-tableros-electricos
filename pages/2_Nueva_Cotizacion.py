@@ -69,9 +69,18 @@ if tipo_tablero == "Contraincendio":
     altitud_msnm = c2.number_input(
         "Altitud de operación (msnm)", min_value=0, value=0, step=100
     )
-    tipo_control = c3.selectbox(
-        "Estrategia de control", ["Estrella-triángulo", "Softstarter"]
+    estrategias_contraincendio = (
+        ["Estrella-triángulo", "Softstarter"]
+        if tension == 220
+        else ["Softstarter"]
     )
+    tipo_control = c3.selectbox(
+        "Estrategia de control", estrategias_contraincendio
+    )
+    if tension in (380, 440):
+        st.caption(
+            "Para tensiones de 380 V y 440 V la estrategia disponible es Softstarter."
+        )
     cantidad_bombas = 2
     fases = 3
     presion_trabajo = 1.0
