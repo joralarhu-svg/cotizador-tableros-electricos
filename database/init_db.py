@@ -111,6 +111,11 @@ def crear_estructura_comercial():
             "subtotal_venta": "REAL NOT NULL DEFAULT 0",
             "igv_monto": "REAL NOT NULL DEFAULT 0",
             "total_venta": "REAL NOT NULL DEFAULT 0",
+            "vigencia_dias": "INTEGER NOT NULL DEFAULT 15",
+            "plazo_entrega": "TEXT NOT NULL DEFAULT 'Por coordinar'",
+            "garantia": "TEXT NOT NULL DEFAULT '12 meses'",
+            "forma_pago": "TEXT NOT NULL DEFAULT '50% de adelanto y 50% contra entrega'",
+            "condiciones_adicionales": "TEXT",
         }
         for nombre, definicion in nuevas_columnas.items():
             if nombre not in columnas:
@@ -132,6 +137,24 @@ def crear_estructura_comercial():
                 FOREIGN KEY (cotizacion_id) REFERENCES cotizaciones(id) ON DELETE CASCADE
             )
             """
+        )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS configuracion_empresa (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                razon_social TEXT NOT NULL DEFAULT 'MI EMPRESA',
+                ruc TEXT,
+                direccion TEXT,
+                telefono TEXT,
+                correo TEXT,
+                sitio_web TEXT
+            )
+            """
+        )
+        conexion.execute(
+            """INSERT OR IGNORE INTO configuracion_empresa
+            (id, razon_social, ruc, direccion, telefono, correo, sitio_web)
+            VALUES (1, 'MI EMPRESA', '', '', '', '', '')"""
         )
         conexion.commit()
     finally:
