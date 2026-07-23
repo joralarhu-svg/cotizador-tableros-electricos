@@ -110,6 +110,39 @@ def es_proteccion_circuito_derivado(fila):
     return clasificar_proteccion_circuito_derivado(fila) is not None
 
 
+def extraer_numero_polos(texto):
+    texto = _normalizar(texto)
+    coincidencia = re.search(r"\b([1-4])\s*p\b", texto)
+    if coincidencia:
+        return int(coincidencia.group(1))
+    nombres = {
+        "monopolar": 1,
+        "un polo": 1,
+        "bipolar": 2,
+        "dos polos": 2,
+        "tripolar": 3,
+        "tres polos": 3,
+        "tetrapolar": 4,
+        "cuatro polos": 4,
+    }
+    for nombre, polos in nombres.items():
+        if nombre in texto:
+            return polos
+    return None
+
+
+def cumple_polos_circuito_derivado(fila, polos_requeridos):
+    tipo = clasificar_proteccion_circuito_derivado(fila)
+    if tipo == "Guardamotor":
+        return True
+    if tipo != "Interruptor termomagnético":
+        return False
+    polos = extraer_numero_polos(
+        f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
+    )
+    return polos == int(polos_requeridos)
+
+
 def obtener_cotizacion(cotizacion_id):
     conexion = obtener_conexion()
     try:
@@ -155,10 +188,12 @@ def generar_requerimientos(cotizacion):
             "corriente_requerida": corriente_bomba,
             "criterio_corriente": "minima",
             "tipo_componente": "proteccion_circuito_derivado",
+            "polos_requeridos": int(cotizacion["fases"]),
             "nota": (
                 f"Un interruptor termomagnético o guardamotor por variador. "
                 f"Solo se muestran equipos con capacidad mínima de "
-                f"{corriente_bomba:.2f} A después del derrateo."
+                f"{corriente_bomba:.2f} A después del derrateo; los "
+                f"interruptores deben ser de {cotizacion['fases']} polos."
             ),
         },
         {
@@ -301,7 +336,12 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
 
     if requerimiento.get("tipo_componente") == "proteccion_circuito_derivado":
         componentes = componentes[
-            componentes.apply(es_proteccion_circuito_derivado, axis=1)
+            componentes.apply(
+                lambda fila: cumple_polos_circuito_derivado(
+                    fila, requerimiento["polos_requeridos"]
+                ),
+                axis=1,
+            )
         ].copy()
         if componentes.empty:
             return componentes.reset_index(drop=True)
