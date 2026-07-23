@@ -23,7 +23,8 @@ class InventarioTest(unittest.TestCase):
             "codigo": "VDF-001", "descripcion": "Variador 5 HP",
             "categoria": "Variadores", "marca": "WEG", "modelo": "CFW500",
             "unidad": "und", "stock": 2, "stock_minimo": 1,
-            "costo_unitario": 850.0, "moneda": "PEN", "proveedor": "",
+            "costo_unitario": 850.0, "corriente_nominal": 18.0,
+            "moneda": "PEN", "proveedor": "",
             "ubicacion": "A-01", "estado": "Activo", "observaciones": "",
         }])
         resultado = guardar_componentes(datos)
@@ -35,11 +36,12 @@ class InventarioTest(unittest.TestCase):
         from modules.inventario import procesar_archivo_excel
         columnas = [
             "codigo", "descripcion", "categoria", "marca", "modelo", "unidad",
-            "stock", "stock_minimo", "costo_unitario", "moneda", "proveedor",
+            "stock", "stock_minimo", "costo_unitario", "corriente_nominal",
+            "moneda", "proveedor",
             "ubicacion", "estado", "observaciones",
         ]
         fila = ["VDF-001", "Variador", "Variadores", "WEG", "CFW500", "und",
-                1, 0, 850, "PEN", "", "", "Activo", ""]
+                1, 0, 850, 18, "PEN", "", "", "Activo", ""]
         archivo = io.BytesIO()
         with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
             pd.DataFrame([fila], columns=columnas).to_excel(
@@ -49,8 +51,8 @@ class InventarioTest(unittest.TestCase):
         dataframe, errores = procesar_archivo_excel(archivo)
         self.assertEqual(errores, [])
         self.assertEqual(len(dataframe), 1)
+        self.assertEqual(dataframe.iloc[0]["corriente_nominal"], 18)
 
 
 if __name__ == "__main__":
     unittest.main()
-
