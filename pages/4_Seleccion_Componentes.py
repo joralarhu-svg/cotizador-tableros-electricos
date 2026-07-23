@@ -49,7 +49,8 @@ st.info(
     f"Factor de derrateo: {factor_derrateo:.3f} · "
     f"Corriente corregida por bomba: {corriente_corregida:.2f} A"
 )
-st.caption(f"Control: {cotizacion['tipo_control']} · Sensor: {cotizacion['senal_sensor']}")
+alarma = "Con alarma" if cotizacion.get("con_alarma", 0) else "Sin alarma"
+st.caption(f"Control: {cotizacion['tipo_control']} · {alarma}")
 
 requerimientos = generar_requerimientos(cotizacion)
 selecciones = []
