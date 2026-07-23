@@ -224,6 +224,25 @@ def es_componente_circuito_control(fila, subtipo):
             and "rele programable" not in texto
             and "base de rele" not in texto
         )
+    if subtipo == "rele_auxiliar_220v":
+        es_rele_auxiliar = any(
+            nombre in texto
+            for nombre in [
+                "rele auxiliar", "rele enchufable", "rele interfaz"
+            ]
+        )
+        es_220v = bool(re.search(r"\b220\s*v(?:ac)?\b", texto))
+        return (
+            es_rele_auxiliar
+            and es_220v
+            and "rele programable" not in texto
+            and "base de rele" not in texto
+        )
+    if subtipo == "temporizador":
+        return (
+            ("temporizador" in texto or "timer" in texto)
+            and "base" not in texto
+        )
     if subtipo == "distribucion":
         return any(
             nombre in texto
@@ -354,6 +373,44 @@ def generar_requerimientos_contraincendio(cotizacion):
             ),
         },
     ]
+    requerimientos.extend([
+        {
+            "grupo": "Accesorios de control - Fusibles",
+            "cantidad": 2,
+            "palabras": ["fusible"],
+            "criterio_corriente": None,
+            "tipo_componente": "circuito_control",
+            "subtipo_control": "fusible",
+            "nota": "Dos fusibles para protección de los circuitos de control.",
+        },
+        {
+            "grupo": "Accesorios de control - Portafusibles",
+            "cantidad": 2,
+            "palabras": ["portafusible", "porta fusible", "base para fusible"],
+            "criterio_corriente": None,
+            "tipo_componente": "circuito_control",
+            "subtipo_control": "portafusible",
+            "nota": "Dos portafusibles, uno por cada fusible de control.",
+        },
+        {
+            "grupo": "Accesorios de control - Relés auxiliares 220 V",
+            "cantidad": 3,
+            "palabras": ["rele auxiliar", "rele enchufable", "rele interfaz"],
+            "criterio_corriente": None,
+            "tipo_componente": "circuito_control",
+            "subtipo_control": "rele_auxiliar_220v",
+            "nota": "Tres relés auxiliares con bobina de 220 V.",
+        },
+        {
+            "grupo": "Accesorios de control - Temporizadores",
+            "cantidad": 2,
+            "palabras": ["temporizador", "timer"],
+            "criterio_corriente": None,
+            "tipo_componente": "circuito_control",
+            "subtipo_control": "temporizador",
+            "nota": "Dos temporizadores o timers para la secuencia de control.",
+        },
+    ])
     accesorios = [
         ("Accesorios de puerta - Piloto amarillo", 1, "piloto", "ambar",
          ["piloto de senalizacion amarillo", "piloto senalizacion amarillo"]),
