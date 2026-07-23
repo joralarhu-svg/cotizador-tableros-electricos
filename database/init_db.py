@@ -17,6 +17,8 @@ def crear_tabla_componentes():
                 stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
                 stock_minimo INTEGER NOT NULL DEFAULT 0 CHECK (stock_minimo >= 0),
                 costo_unitario REAL NOT NULL DEFAULT 0 CHECK (costo_unitario >= 0),
+                corriente_nominal REAL NOT NULL DEFAULT 0
+                    CHECK (corriente_nominal >= 0),
                 moneda TEXT NOT NULL DEFAULT 'PEN' CHECK (moneda IN ('PEN', 'USD')),
                 proveedor TEXT,
                 ubicacion TEXT,
@@ -28,6 +30,14 @@ def crear_tabla_componentes():
             )
             """
         )
+        columnas = {
+            fila["name"] for fila in conexion.execute("PRAGMA table_info(componentes)")
+        }
+        if "corriente_nominal" not in columnas:
+            conexion.execute(
+                """ALTER TABLE componentes ADD COLUMN corriente_nominal
+                REAL NOT NULL DEFAULT 0"""
+            )
         conexion.commit()
     finally:
         conexion.close()
