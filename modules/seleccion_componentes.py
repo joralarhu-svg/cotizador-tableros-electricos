@@ -491,6 +491,13 @@ def generar_requerimientos(cotizacion):
             "nota": "Un temporizador por arrancador estrella-triángulo.",
         })
 
+    for requerimiento in requerimientos:
+        if requerimiento.get("criterio_corriente") == "minima":
+            requerimiento["nota"] += (
+                " Se muestran únicamente los dos calibres superiores más "
+                "cercanos a la corriente requerida."
+            )
+
     return requerimientos
 
 
@@ -621,10 +628,6 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
         ].copy()
         if candidatos.empty:
             return candidatos.reset_index(drop=True)
-        candidatos = candidatos.sort_values(
-            ["corriente_seleccion", "puntaje", "stock", "descripcion"],
-            ascending=[True, False, False, True],
-        )
         if (
             requerimiento.get("tipo_componente")
             == "proteccion_circuito_derivado"
@@ -634,9 +637,29 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
             )
             candidatos = pd.concat(
                 [
-                    candidatos[
+                    (
+                        candidatos[
                         candidatos["tipo_proteccion"] == tipo
-                    ].head(limite)
+                        ]
+                        .loc[lambda datos: datos["corriente_seleccion"].isin(
+                            sorted(
+                                datos["corriente_seleccion"].unique()
+                            )[:2]
+                        )]
+                        .sort_values(
+                            [
+                                "corriente_seleccion", "puntaje",
+                                "stock", "descripcion",
+                            ],
+                            ascending=[True, False, False, True],
+                        )
+                        .groupby(
+                            "corriente_seleccion",
+                            sort=False,
+                            group_keys=False,
+                        )
+                        .head(limite)
+                    )
                     for tipo in [
                         "Guardamotor",
                         "Interruptor termomagnético",
@@ -654,7 +677,22 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
                 ],
                 ascending=[True, True, False, False, True],
             ).reset_index(drop=True)
-        return candidatos.head(limite).reset_index(drop=True)
+        corrientes_cercanas = sorted(
+            candidatos["corriente_seleccion"].unique()
+        )[:2]
+        candidatos = candidatos[
+            candidatos["corriente_seleccion"].isin(corrientes_cercanas)
+        ].sort_values(
+            ["corriente_seleccion", "puntaje", "stock", "descripcion"],
+            ascending=[True, False, False, True],
+        )
+        return (
+            candidatos.groupby(
+                "corriente_seleccion", sort=False, group_keys=False
+            )
+            .head(limite)
+            .reset_index(drop=True)
+        )
     return candidatos.sort_values(
         ["puntaje", "stock", "descripcion"], ascending=[False, False, True]
     ).head(limite).reset_index(drop=True)
