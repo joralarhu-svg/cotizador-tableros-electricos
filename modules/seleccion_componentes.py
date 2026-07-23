@@ -70,6 +70,34 @@ def es_variador_frecuencia(fila):
     )
 
 
+def es_proteccion_circuito_derivado(fila):
+    texto = _normalizar(
+        f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
+    )
+    tipos_admitidos = [
+        "guardamotor",
+        "guarda motor",
+        "interruptor termomagnetico",
+        "interruptor automatico",
+        "interruptor caja moldeada",
+        "disyuntor",
+        "breaker",
+        "mcb",
+        "mccb",
+    ]
+    tipos_excluidos = [
+        "contactor",
+        "arrancador suave",
+        "soft starter",
+        "variador",
+        "rele termico",
+    ]
+    return (
+        any(tipo in texto for tipo in tipos_admitidos)
+        and not any(tipo in texto for tipo in tipos_excluidos)
+    )
+
+
 def obtener_cotizacion(cotizacion_id):
     conexion = obtener_conexion()
     try:
@@ -107,13 +135,17 @@ def generar_requerimientos(cotizacion):
             "grupo": "Circuitos derivados",
             "cantidad": total,
             "palabras": [
-                "interruptor termomagnetico", "guarda motor", "guardamotor"
+                "interruptor termomagnetico", "interruptor automatico",
+                "interruptor caja moldeada", "guarda motor", "guardamotor",
+                "disyuntor", "breaker", "mcb", "mccb",
             ],
             "corriente_requerida": corriente_bomba,
             "criterio_corriente": "minima",
+            "tipo_componente": "proteccion_circuito_derivado",
             "nota": (
-                f"Un interruptor o guardamotor por variador, mínimo "
-                f"{corriente_bomba:.2f} A."
+                f"Un interruptor termomagnético o guardamotor por variador. "
+                f"Solo se muestran equipos con capacidad mínima de "
+                f"{corriente_bomba:.2f} A después del derrateo."
             ),
         },
         {
@@ -250,6 +282,13 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
                 ),
                 axis=1,
             )
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
+
+    if requerimiento.get("tipo_componente") == "proteccion_circuito_derivado":
+        componentes = componentes[
+            componentes.apply(es_proteccion_circuito_derivado, axis=1)
         ].copy()
         if componentes.empty:
             return componentes.reset_index(drop=True)
