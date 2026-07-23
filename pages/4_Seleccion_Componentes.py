@@ -70,6 +70,12 @@ st.caption(
 )
 
 requerimientos = generar_requerimientos(cotizacion)
+if not requerimientos:
+    st.info(
+        "La selección automática para tableros contraincendio con arranque "
+        "estrella-triángulo se habilitará cuando se definan sus componentes."
+    )
+    st.stop()
 selecciones = []
 
 with st.form("seleccion_componentes"):
