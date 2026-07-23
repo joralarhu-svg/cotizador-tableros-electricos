@@ -5,7 +5,8 @@ from modules.db import obtener_conexion
 
 COLUMNAS_REQUERIDAS = [
     "codigo", "descripcion", "categoria", "marca", "modelo", "unidad",
-    "stock", "stock_minimo", "costo_unitario", "moneda", "proveedor",
+    "stock", "stock_minimo", "costo_unitario", "corriente_nominal",
+    "moneda", "proveedor",
     "ubicacion", "estado", "observaciones",
 ]
 MONEDAS_PERMITIDAS = {"PEN", "USD"}
@@ -69,7 +70,7 @@ def preparar_dataframe(dataframe):
     dataframe["estado"] = (
         dataframe["estado"].str.lower().map(mapa_estados).fillna(dataframe["estado"])
     )
-    for columna in ["stock", "stock_minimo", "costo_unitario"]:
+    for columna in ["stock", "stock_minimo", "costo_unitario", "corriente_nominal"]:
         dataframe[columna] = pd.to_numeric(dataframe[columna], errors="coerce")
     dataframe = dataframe[
         dataframe["codigo"].ne("") | dataframe["descripcion"].ne("")
@@ -100,6 +101,11 @@ def validar_datos(dataframe):
         costo = fila["costo_unitario"]
         if pd.isna(costo) or costo < 0:
             errores.append(f"Fila {numero_fila}: el costo debe ser un número no negativo.")
+        corriente = fila["corriente_nominal"]
+        if pd.isna(corriente) or corriente < 0:
+            errores.append(
+                f"Fila {numero_fila}: la corriente nominal debe ser un número no negativo."
+            )
         if fila["moneda"] not in MONEDAS_PERMITIDAS:
             errores.append(f"Fila {numero_fila}: la moneda debe ser PEN o USD.")
         if fila["estado"] not in ESTADOS_PERMITIDOS:
@@ -130,6 +136,7 @@ def guardar_componentes(dataframe):
                 fila["descripcion"], fila["categoria"], fila["marca"],
                 fila["modelo"], fila["unidad"], int(fila["stock"]),
                 int(fila["stock_minimo"]), float(fila["costo_unitario"]),
+                float(fila["corriente_nominal"]),
                 fila["moneda"], fila["proveedor"], fila["ubicacion"],
                 fila["estado"], fila["observaciones"],
             )
@@ -137,7 +144,8 @@ def guardar_componentes(dataframe):
                 conexion.execute(
                     """UPDATE componentes SET descripcion=?, categoria=?, marca=?,
                     modelo=?, unidad=?, stock=?, stock_minimo=?, costo_unitario=?,
-                    moneda=?, proveedor=?, ubicacion=?, estado=?, observaciones=?,
+                    corriente_nominal=?, moneda=?, proveedor=?, ubicacion=?,
+                    estado=?, observaciones=?,
                     fecha_actualizacion=CURRENT_TIMESTAMP WHERE codigo=?""",
                     datos + (fila["codigo"],),
                 )
@@ -145,9 +153,9 @@ def guardar_componentes(dataframe):
             else:
                 conexion.execute(
                     """INSERT INTO componentes (descripcion, categoria, marca, modelo,
-                    unidad, stock, stock_minimo, costo_unitario, moneda, proveedor,
-                    ubicacion, estado, observaciones, codigo)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    unidad, stock, stock_minimo, costo_unitario, corriente_nominal,
+                    moneda, proveedor, ubicacion, estado, observaciones, codigo)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     datos + (fila["codigo"],),
                 )
                 nuevos += 1
@@ -167,7 +175,8 @@ def obtener_componentes():
     try:
         return pd.read_sql_query(
             """SELECT id, codigo, descripcion, categoria, marca, modelo, unidad,
-            stock, stock_minimo, costo_unitario, moneda, proveedor, ubicacion,
+            stock, stock_minimo, costo_unitario, corriente_nominal, moneda,
+            proveedor, ubicacion,
             estado, observaciones FROM componentes ORDER BY categoria, descripcion""",
             conexion,
         )
@@ -182,13 +191,14 @@ def actualizar_inventario(dataframe):
             stock = int(fila["stock"])
             stock_minimo = int(fila["stock_minimo"])
             costo = float(fila["costo_unitario"])
-            if stock < 0 or stock_minimo < 0 or costo < 0:
+            corriente = float(fila["corriente_nominal"])
+            if stock < 0 or stock_minimo < 0 or costo < 0 or corriente < 0:
                 raise ValueError(f"Los valores de {fila['codigo']} no pueden ser negativos.")
             conexion.execute(
                 """UPDATE componentes SET stock=?, stock_minimo=?, costo_unitario=?,
-                proveedor=?, ubicacion=?, estado=?, observaciones=?,
+                corriente_nominal=?, proveedor=?, ubicacion=?, estado=?, observaciones=?,
                 fecha_actualizacion=CURRENT_TIMESTAMP WHERE id=?""",
-                (stock, stock_minimo, costo, limpiar_texto(fila["proveedor"]),
+                (stock, stock_minimo, costo, corriente, limpiar_texto(fila["proveedor"]),
                  limpiar_texto(fila["ubicacion"]), fila["estado"],
                  limpiar_texto(fila["observaciones"]), int(fila["id"])),
             )
@@ -199,4 +209,3 @@ def actualizar_inventario(dataframe):
         return {"correcto": False, "mensaje": f"No se pudo actualizar el inventario: {error}"}
     finally:
         conexion.close()
-
