@@ -37,7 +37,8 @@ class SeleccionComponentesTest(unittest.TestCase):
         cotizacion = {
             "cantidad_bombas": 2, "tipo_control": "Un variador por bomba",
             "potencia_hp": 5.0, "corriente_motor": 14.0,
-            "altitud_msnm": 2000, "tension": 220, "senal_sensor": "4-20 mA",
+            "altitud_msnm": 2000, "tension": 220, "fases": 3,
+            "senal_sensor": "4-20 mA",
         }
         requerimientos = generar_requerimientos(cotizacion)
         self.assertEqual(requerimientos[0]["cantidad"], 2)
@@ -51,6 +52,7 @@ class SeleccionComponentesTest(unittest.TestCase):
             requerimientos[2]["tipo_componente"],
             "proteccion_circuito_derivado",
         )
+        self.assertEqual(requerimientos[2]["polos_requeridos"], 3)
 
     def test_calcula_derrateo_y_extrae_corriente(self):
         from modules.seleccion_componentes import (
@@ -58,6 +60,7 @@ class SeleccionComponentesTest(unittest.TestCase):
             calcular_factor_derrateo,
             extraer_rango_corriente,
             extraer_rangos_tension,
+            extraer_numero_polos,
             admite_tension,
         )
         self.assertEqual(calcular_factor_derrateo(1000), 1.0)
@@ -78,6 +81,8 @@ class SeleccionComponentesTest(unittest.TestCase):
         self.assertTrue(admite_tension("Variador entrada 200-240VAC", 220))
         self.assertFalse(admite_tension("Variador trifásico 380V", 220))
         self.assertIn((380.0, 380.0), extraer_rangos_tension("Equipo 380VAC"))
+        self.assertEqual(extraer_numero_polos("Interruptor 3P C20"), 3)
+        self.assertEqual(extraer_numero_polos("Interruptor tetrapolar"), 4)
 
     def test_busca_y_guarda_componente(self):
         from modules.inventario import guardar_componentes
@@ -311,6 +316,49 @@ class SeleccionComponentesTest(unittest.TestCase):
         self.assertTrue(
             (candidatos["corriente_seleccion"] >= 15.4).all()
         )
+
+    def test_circuitos_derivados_descarta_interruptores_con_polos_incorrectos(self):
+        from modules.inventario import guardar_componentes
+        from modules.seleccion_componentes import (
+            buscar_candidatos, generar_requerimientos, obtener_cotizacion,
+        )
+        base = {
+            "unidad": "und", "stock": 5, "stock_minimo": 0,
+            "costo_unitario": 100, "corriente_nominal": 20,
+            "moneda": "PEN", "proveedor": "", "ubicacion": "",
+            "estado": "Activo", "observaciones": "", "marca": "Prueba",
+            "categoria": "Interruptores termomagnéticos",
+        }
+        guardar_componentes(pd.DataFrame([
+            {
+                **base, "codigo": "TM-1P",
+                "descripcion": "Interruptor termomagnético 1P C 20AMP",
+                "modelo": "M1P",
+            },
+            {
+                **base, "codigo": "TM-2P",
+                "descripcion": "Interruptor termomagnético 2P C 20AMP",
+                "modelo": "M2P",
+            },
+            {
+                **base, "codigo": "TM-3P",
+                "descripcion": "Interruptor termomagnético 3P C 20AMP",
+                "modelo": "M3P",
+            },
+            {
+                **base, "codigo": "TM-4P",
+                "descripcion": "Interruptor termomagnético 4P C 20AMP",
+                "modelo": "M4P",
+            },
+        ]))
+        creada = self._crear_cotizacion()
+        cotizacion = obtener_cotizacion(creada["id"])
+        requerimiento = next(
+            item for item in generar_requerimientos(cotizacion)
+            if item["grupo"] == "Circuitos derivados"
+        )
+        candidatos = buscar_candidatos(requerimiento, cotizacion)
+        self.assertEqual(candidatos["codigo"].tolist(), ["TM-3P"])
 
 
 if __name__ == "__main__":
