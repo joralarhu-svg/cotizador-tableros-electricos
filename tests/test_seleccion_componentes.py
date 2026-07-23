@@ -701,6 +701,41 @@ class SeleccionComponentesTest(unittest.TestCase):
                 "descripcion": "Relé térmico regulable 9-13A",
                 "categoria": "Relés térmicos", "corriente_nominal": 0,
             },
+            {
+                **base, "codigo": "FUS-CONTROL",
+                "descripcion": "Fusible cilíndrico de control 10x38",
+                "categoria": "Fusibles", "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "PF-CONTROL",
+                "descripcion": "Portafusible modular 10x38",
+                "categoria": "Portafusibles", "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "RA-220",
+                "descripcion": "Relé auxiliar enchufable bobina 220VAC",
+                "categoria": "Relés auxiliares", "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "RA-24",
+                "descripcion": "Relé auxiliar enchufable bobina 24VDC",
+                "categoria": "Relés auxiliares", "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "BASE-RA-220",
+                "descripcion": "Base de relé auxiliar enchufable 220VAC",
+                "categoria": "Accesorios", "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "TIM-1",
+                "descripcion": "Temporizador electrónico multifunción",
+                "categoria": "Temporizadores", "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "BASE-TIM",
+                "descripcion": "Base para timer electrónico",
+                "categoria": "Accesorios", "corriente_nominal": 0,
+            },
         ])
         accesorios = [
             ("PIL-AM", "Piloto de señalización amarillo 22mm"),
@@ -750,6 +785,10 @@ class SeleccionComponentesTest(unittest.TestCase):
             "Protección trifásica de bomba jockey": ["INT-3P-10", "INT-3P-16"],
             "Contactor de bomba jockey": ["CON-9", "CON-12"],
             "Relé térmico de bomba jockey": ["REL-7-10"],
+            "Accesorios de control - Fusibles": ["FUS-CONTROL"],
+            "Accesorios de control - Portafusibles": ["PF-CONTROL"],
+            "Accesorios de control - Relés auxiliares 220 V": ["RA-220"],
+            "Accesorios de control - Temporizadores": ["TIM-1"],
             "Accesorios de puerta - Piloto amarillo": ["PIL-AM"],
             "Accesorios de puerta - Pilotos verdes": ["PIL-VE"],
             "Accesorios de puerta - Pilotos rojos": ["PIL-RO"],
@@ -764,6 +803,10 @@ class SeleccionComponentesTest(unittest.TestCase):
             "Accesorios de puerta - Conmutador": 1,
             "Accesorios de puerta - Pulsador NA": 1,
             "Accesorios de puerta - Pulsador NC": 1,
+            "Accesorios de control - Fusibles": 2,
+            "Accesorios de control - Portafusibles": 2,
+            "Accesorios de control - Relés auxiliares 220 V": 3,
+            "Accesorios de control - Temporizadores": 2,
         }
         for grupo, codigos in esperados.items():
             candidatos = buscar_candidatos(requerimientos[grupo], cotizacion)
