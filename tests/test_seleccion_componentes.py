@@ -111,6 +111,26 @@ class SeleccionComponentesTest(unittest.TestCase):
         )
         self.assertEqual(candidatos["codigo"].tolist(), ["VDF-18A"])
 
+    def test_sin_capacidad_suficiente_devuelve_lista_vacia(self):
+        from modules.inventario import guardar_componentes
+        from modules.seleccion_componentes import (
+            buscar_candidatos, generar_requerimientos, obtener_cotizacion,
+        )
+        guardar_componentes(pd.DataFrame([{
+            "codigo": "VDF-12A", "descripcion": "Variador 5 HP 12A 220V",
+            "categoria": "Variadores", "marca": "A", "modelo": "",
+            "unidad": "und", "stock": 5, "stock_minimo": 0,
+            "costo_unitario": 500, "moneda": "PEN", "proveedor": "",
+            "ubicacion": "", "estado": "Activo", "observaciones": "",
+        }]))
+        creada = self._crear_cotizacion()
+        cotizacion = obtener_cotizacion(creada["id"])
+        candidatos = buscar_candidatos(
+            generar_requerimientos(cotizacion)[0], cotizacion
+        )
+        self.assertTrue(candidatos.empty)
+        self.assertIn("puntaje", candidatos.columns)
+
 
 if __name__ == "__main__":
     unittest.main()
