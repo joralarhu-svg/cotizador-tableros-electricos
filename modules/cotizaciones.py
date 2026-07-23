@@ -5,6 +5,9 @@ import pandas as pd
 from modules.db import obtener_conexion
 
 
+TIPOS_TABLERO = ("Presión constante", "Alternador", "Contraincendio")
+
+
 def obtener_clientes():
     conexion = obtener_conexion()
     try:
@@ -66,6 +69,8 @@ def generar_numero_cotizacion(conexion):
 
 def validar_datos_tecnicos(datos):
     errores = []
+    if datos.get("tipo_tablero", "Presión constante") not in TIPOS_TABLERO:
+        errores.append("El tipo de tablero seleccionado no es válido.")
     if datos["cantidad_bombas"] < 1:
         errores.append("La cantidad de bombas debe ser mayor que cero.")
     if datos["potencia_hp"] <= 0 or datos["corriente_motor"] <= 0:
@@ -86,12 +91,13 @@ def registrar_cotizacion(cliente_id, datos):
         numero = generar_numero_cotizacion(conexion)
         cursor = conexion.execute(
             """INSERT INTO cotizaciones (
-            numero, cliente_id, proyecto, cantidad_bombas, bombas_operacion,
+            numero, cliente_id, proyecto, tipo_tablero, cantidad_bombas, bombas_operacion,
             bombas_reserva, potencia_hp, corriente_motor, tension, fases,
             tipo_control, presion_trabajo, unidad_presion, con_alarma,
             observaciones, altitud_msnm, estado)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Borrador')""",
-            (numero, cliente_id, datos["proyecto"].strip(), datos["cantidad_bombas"],
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Borrador')""",
+            (numero, cliente_id, datos["proyecto"].strip(),
+             datos.get("tipo_tablero", "Presión constante"), datos["cantidad_bombas"],
              datos["cantidad_bombas"], 0, datos["potencia_hp"],
              datos["corriente_motor"], datos["tension"], datos["fases"],
              datos["tipo_control"], datos["presion_trabajo"], datos["unidad_presion"],
@@ -113,6 +119,7 @@ def obtener_cotizaciones():
     try:
         return pd.read_sql_query(
             """SELECT c.id, c.numero, cl.razon_social AS cliente, c.proyecto,
+            c.tipo_tablero,
             c.cantidad_bombas, c.potencia_hp, c.corriente_motor,
             c.altitud_msnm, c.tension, c.tipo_control,
             c.presion_trabajo, c.unidad_presion, c.con_alarma,
