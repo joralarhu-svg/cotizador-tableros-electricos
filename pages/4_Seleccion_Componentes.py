@@ -50,7 +50,10 @@ st.info(
     f"Corriente corregida por bomba: {corriente_corregida:.2f} A"
 )
 alarma = "Con alarma" if cotizacion.get("con_alarma", 0) else "Sin alarma"
-st.caption(f"Control: {cotizacion['tipo_control']} · {alarma}")
+st.caption(
+    f"Tablero: {cotizacion.get('tipo_tablero', 'Presión constante')} · "
+    f"Control: {cotizacion['tipo_control']} · {alarma}"
+)
 
 requerimientos = generar_requerimientos(cotizacion)
 selecciones = []
