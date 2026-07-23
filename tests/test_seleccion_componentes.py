@@ -67,6 +67,23 @@ class SeleccionComponentesTest(unittest.TestCase):
                 "Accesorios de puerta - Piloto ámbar": 1,
             },
         )
+        circuito_control = {
+            item["grupo"]: item["cantidad"]
+            for item in requerimientos
+            if item["grupo"].startswith("Circuito de control")
+        }
+        self.assertEqual(
+            circuito_control,
+            {
+                "Circuito de control - Fusibles": 4,
+                "Circuito de control - Portafusibles": 4,
+                "Circuito de control - Relés auxiliares 24 VDC": 2,
+            },
+        )
+        self.assertNotIn(
+            "Circuito de potencia - Cuadros de distribución",
+            [item["grupo"] for item in requerimientos],
+        )
 
     def test_calcula_derrateo_y_extrae_corriente(self):
         from modules.seleccion_componentes import (
@@ -429,6 +446,104 @@ class SeleccionComponentesTest(unittest.TestCase):
             "Accesorios de puerta - Pilotos verdes": ["PIL-VERDE"],
             "Accesorios de puerta - Pilotos rojos": ["PIL-ROJO"],
             "Accesorios de puerta - Piloto ámbar": ["PIL-AMARILLO"],
+        }
+        for grupo, codigos in esperados.items():
+            candidatos = buscar_candidatos(
+                requerimientos[grupo], cotizacion
+            )
+            self.assertEqual(candidatos["codigo"].tolist(), codigos)
+
+    def test_circuito_control_filtra_componentes_y_calcula_distribucion(self):
+        from modules.inventario import guardar_componentes
+        from modules.cotizaciones import registrar_cliente, registrar_cotizacion
+        from modules.seleccion_componentes import (
+            buscar_candidatos, generar_requerimientos, obtener_cotizacion,
+        )
+        base = {
+            "unidad": "und", "stock": 10, "stock_minimo": 0,
+            "costo_unitario": 20, "moneda": "PEN", "proveedor": "",
+            "ubicacion": "", "estado": "Activo", "observaciones": "",
+            "marca": "Prueba",
+        }
+        guardar_componentes(pd.DataFrame([
+            {
+                **base, "codigo": "FUS-10A",
+                "descripcion": "Fusible cilindro 10X38 10AMP",
+                "categoria": "Fusibles", "modelo": "F10",
+                "corriente_nominal": 10,
+            },
+            {
+                **base, "codigo": "PF-10X38",
+                "descripcion": "Base para fusible 1P 10X38",
+                "categoria": "Portafusibles", "modelo": "PF1",
+                "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "REL-24DC",
+                "descripcion": "Relé auxiliar enchufable bobina 24VDC",
+                "categoria": "Relés auxiliares", "modelo": "R24",
+                "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "REL-220AC",
+                "descripcion": "Relé auxiliar enchufable bobina 220VAC",
+                "categoria": "Relés auxiliares", "modelo": "R220",
+                "corriente_nominal": 0,
+            },
+            {
+                **base, "codigo": "DIST-40A",
+                "descripcion": "Bloque de distribución 4 polos 40A",
+                "categoria": "Distribución", "modelo": "D40",
+                "corriente_nominal": 40,
+            },
+            {
+                **base, "codigo": "DIST-63A",
+                "descripcion": "Bloque repartidor de potencia 4 polos 63A",
+                "categoria": "Distribución", "modelo": "D63",
+                "corriente_nominal": 63,
+            },
+        ]))
+        cliente = registrar_cliente({
+            "tipo_documento": "RUC", "numero_documento": "20999999999",
+            "razon_social": "Cliente 3 bombas", "contacto": "",
+            "telefono": "", "correo": "", "direccion": "",
+        })
+        creada = registrar_cotizacion(cliente, {
+            "proyecto": "Presión constante", "cantidad_bombas": 3,
+            "potencia_hp": 5.0, "corriente_motor": 14.0,
+            "tension": 220, "fases": 3, "altitud_msnm": 2000,
+            "tipo_control": "Un variador por bomba",
+            "presion_trabajo": 4.0, "unidad_presion": "bar",
+            "senal_sensor": "4-20 mA", "observaciones": "",
+        })
+        cotizacion = obtener_cotizacion(creada["id"])
+        requerimientos = {
+            item["grupo"]: item
+            for item in generar_requerimientos(cotizacion)
+        }
+        self.assertEqual(
+            requerimientos["Circuito de control - Fusibles"]["cantidad"], 4
+        )
+        self.assertEqual(
+            requerimientos["Circuito de control - Portafusibles"]["cantidad"],
+            4,
+        )
+        self.assertEqual(
+            requerimientos[
+                "Circuito de control - Relés auxiliares 24 VDC"
+            ]["cantidad"],
+            3,
+        )
+        distribucion = requerimientos[
+            "Circuito de potencia - Cuadros de distribución"
+        ]
+        self.assertEqual(distribucion["cantidad"], 3)
+        self.assertAlmostEqual(distribucion["corriente_requerida"], 46.2)
+        esperados = {
+            "Circuito de control - Fusibles": ["FUS-10A"],
+            "Circuito de control - Portafusibles": ["PF-10X38"],
+            "Circuito de control - Relés auxiliares 24 VDC": ["REL-24DC"],
+            "Circuito de potencia - Cuadros de distribución": ["DIST-63A"],
         }
         for grupo, codigos in esperados.items():
             candidatos = buscar_candidatos(
