@@ -428,3 +428,18 @@ def guardar_seleccion(cotizacion_id, selecciones):
 
 
 def obtener_detalle_cotizacion(cotizacion_id):
+    conexion = obtener_conexion()
+    try:
+        return pd.read_sql_query(
+            """SELECT d.id, c.codigo, c.descripcion, c.marca, d.cantidad,
+            c.stock, d.costo_unitario, d.margen, d.precio_unitario,
+            d.cantidad * d.precio_unitario AS subtotal, c.moneda,
+            d.observaciones
+            FROM detalle_cotizacion d
+            JOIN componentes c ON c.id = d.componente_id
+            WHERE d.cotizacion_id = ? ORDER BY c.categoria, c.descripcion""",
+            conexion,
+            params=(cotizacion_id,),
+        )
+    finally:
+        conexion.close()
