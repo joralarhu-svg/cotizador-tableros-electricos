@@ -63,9 +63,11 @@ with st.form("formulario_cotizacion", clear_on_submit=False):
         ["Un variador por bomba", "Un variador compartido", "Arranque directo", "Estrella-triángulo"],
     )
     presion_trabajo = c4.number_input("Presión de trabajo", min_value=0.1, value=4.0, step=0.1)
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     unidad_presion = c1.selectbox("Unidad de presión", ["bar", "psi", "mca"])
-    senal_sensor = c2.selectbox("Señal del transmisor de presión", ["4-20 mA", "0-10 V"])
+    sistema_alarma = c2.selectbox(
+        "Sistema de alarma", ["Sin alarma", "Con alarma"]
+    )
     observaciones = st.text_area("Observaciones técnicas")
     guardar = st.form_submit_button("Guardar borrador de cotización", type="primary")
 
@@ -84,7 +86,8 @@ if guardar:
                 "altitud_msnm": float(altitud_msnm),
                 "tension": int(tension), "fases": int(fases), "tipo_control": tipo_control,
                 "presion_trabajo": float(presion_trabajo), "unidad_presion": unidad_presion,
-                "senal_sensor": senal_sensor, "observaciones": observaciones,
+                "con_alarma": sistema_alarma == "Con alarma",
+                "observaciones": observaciones,
             })
             if resultado["correcto"]:
                 st.success(f"Cotización {resultado['numero']} creada como borrador.")
