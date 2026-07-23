@@ -3,6 +3,7 @@ import tempfile
 import unittest
 
 import pandas as pd
+import pdfplumber
 
 
 class GeneradorPdfTest(unittest.TestCase):
@@ -38,8 +39,9 @@ class GeneradorPdfTest(unittest.TestCase):
         })
         cot = registrar_cotizacion(cliente_id, {
             "proyecto": "Sistema de presión constante", "cantidad_bombas": 1,
-            "bombas_operacion": 1, "bombas_reserva": 0, "potencia_hp": 5,
+            "potencia_hp": 5,
             "corriente_motor": 14, "tension": 220, "fases": 3,
+            "altitud_msnm": 2500,
             "tipo_control": "Un variador por bomba", "presion_trabajo": 50,
             "unidad_presion": "psi", "senal_sensor": "4-20 mA", "observaciones": "",
         })
@@ -65,6 +67,13 @@ class GeneradorPdfTest(unittest.TestCase):
         pdf = generar_pdf_cotizacion(cot["id"])
         self.assertTrue(pdf.startswith(b"%PDF"))
         self.assertGreater(len(pdf), 3000)
+        ruta_pdf = os.path.join(self.tempdir.name, "cotizacion.pdf")
+        with open(ruta_pdf, "wb") as archivo:
+            archivo.write(pdf)
+        with pdfplumber.open(ruta_pdf) as documento:
+            texto = "\n".join(pagina.extract_text() or "" for pagina in documento.pages)
+        self.assertIn("Integración del tablero eléctrico", texto)
+        self.assertNotIn("Ingeniería y programación", texto)
 
 
 if __name__ == "__main__":
