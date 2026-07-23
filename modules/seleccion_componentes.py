@@ -209,6 +209,8 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
 
     componentes["puntaje"] = componentes.apply(puntuar, axis=1)
     candidatos = componentes[componentes["puntaje"] > 0].copy()
+    if candidatos.empty:
+        return candidatos.reset_index(drop=True)
     criterio = requerimiento.get("criterio_corriente")
     corriente_requerida = requerimiento.get("corriente_requerida")
     if criterio and corriente_requerida is not None:
@@ -231,6 +233,8 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
                     lambda rango: rango[1] >= corriente_requerida
                 )
             ]
+        if candidatos.empty:
+            return candidatos.reset_index(drop=True)
     return candidatos.sort_values(
         ["puntaje", "stock", "descripcion"], ascending=[False, False, True]
     ).head(limite).reset_index(drop=True)
