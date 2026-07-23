@@ -31,12 +31,14 @@ class CotizacionesTest(unittest.TestCase):
             "corriente_motor": 14.0, "tension": 220, "fases": 3,
             "altitud_msnm": 2500,
             "tipo_control": "Un variador por bomba", "presion_trabajo": 4.0,
-            "unidad_presion": "bar", "senal_sensor": "4-20 mA",
+            "unidad_presion": "bar", "con_alarma": True,
             "observaciones": "",
         })
         self.assertTrue(resultado["correcto"])
         self.assertTrue(resultado["numero"].startswith("COT-"))
-        self.assertEqual(len(obtener_cotizaciones()), 1)
+        cotizaciones = obtener_cotizaciones()
+        self.assertEqual(len(cotizaciones), 1)
+        self.assertEqual(int(cotizaciones.iloc[0]["con_alarma"]), 1)
 
     def test_rechaza_altitud_negativa(self):
         from modules.cotizaciones import validar_datos_tecnicos
