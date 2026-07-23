@@ -220,6 +220,40 @@ def es_componente_circuito_control(fila, subtipo):
     return False
 
 
+def es_componente_alarma(fila, subtipo):
+    texto = _normalizar(
+        f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
+    )
+    if subtipo == "sirena_220v":
+        return (
+            "sirena" in texto
+            and bool(re.search(r"\b220\s*v(?:ac)?\b", texto))
+        )
+    if subtipo == "rele_auxiliar_220v":
+        es_rele_auxiliar = any(
+            nombre in texto
+            for nombre in [
+                "rele auxiliar", "rele enchufable", "rele interfaz"
+            ]
+        )
+        es_220v = bool(re.search(r"\b220\s*v(?:ac)?\b", texto))
+        return (
+            es_rele_auxiliar
+            and es_220v
+            and "rele programable" not in texto
+            and "base de rele" not in texto
+        )
+    if subtipo == "pulsador_na":
+        es_pulsador = "pulsador" in texto and "cabezal" not in texto
+        es_na = (
+            bool(re.search(r"\b\d*\s*na\b", texto))
+            or "normalmente abierto" in texto
+            or "normal abierto" in texto
+        )
+        return es_pulsador and es_na
+    return False
+
+
 def obtener_cotizacion(cotizacion_id):
     conexion = obtener_conexion()
     try:
@@ -367,7 +401,7 @@ def generar_requerimientos(cotizacion):
             "cantidad": 1,
             "palabras": ["transmisor de presion", "sensor de presion", "presostato"],
             "criterio_corriente": None,
-            "nota": f"Señal requerida: {cotizacion['senal_sensor']}.",
+            "nota": "Un transmisor de presión para la realimentación del sistema.",
         },
         {
             "grupo": "Fuente o transformador de control",
@@ -428,6 +462,47 @@ def generar_requerimientos(cotizacion):
                 f"a la corriente general derrateada."
             ),
         })
+
+    if bool(cotizacion.get("con_alarma", 0)):
+        indice_control = next(
+            indice for indice, item in enumerate(requerimientos)
+            if item["grupo"] == "Control automático"
+        )
+        componentes_alarma = [
+            {
+                "grupo": "Sistema de alarma - Sirena 220 V",
+                "cantidad": 1,
+                "palabras": ["sirena"],
+                "criterio_corriente": None,
+                "tipo_componente": "sistema_alarma",
+                "subtipo_alarma": "sirena_220v",
+                "nota": "Una sirena con alimentación de 220 V.",
+            },
+            {
+                "grupo": "Sistema de alarma - Relé auxiliar 220 V",
+                "cantidad": 1,
+                "palabras": [
+                    "rele auxiliar", "rele enchufable", "rele interfaz"
+                ],
+                "criterio_corriente": None,
+                "tipo_componente": "sistema_alarma",
+                "subtipo_alarma": "rele_auxiliar_220v",
+                "nota": "Un relé auxiliar con bobina de 220 V.",
+            },
+            {
+                "grupo": "Sistema de alarma - Pulsador NA",
+                "cantidad": 1,
+                "palabras": ["pulsador"],
+                "criterio_corriente": None,
+                "tipo_componente": "sistema_alarma",
+                "subtipo_alarma": "pulsador_na",
+                "nota": "Un pulsador con contacto normalmente abierto (NA).",
+            },
+        ]
+        for desplazamiento, componente in enumerate(componentes_alarma):
+            requerimientos.insert(
+                indice_control + desplazamiento, componente
+            )
 
     if tipo_control == "Un variador por bomba":
         requerimientos.insert(0, {
@@ -575,6 +650,18 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
             componentes.apply(
                 lambda fila: es_componente_circuito_control(
                     fila, requerimiento["subtipo_control"]
+                ),
+                axis=1,
+            )
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
+
+    if requerimiento.get("tipo_componente") == "sistema_alarma":
+        componentes = componentes[
+            componentes.apply(
+                lambda fila: es_componente_alarma(
+                    fila, requerimiento["subtipo_alarma"]
                 ),
                 axis=1,
             )
