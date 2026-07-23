@@ -36,6 +36,7 @@ class ResumenComercialTest(unittest.TestCase):
         cotizacion = registrar_cotizacion(cliente, {
             "proyecto": "Proyecto", "cantidad_bombas": 1, "bombas_operacion": 1,
             "bombas_reserva": 0, "potencia_hp": 5, "corriente_motor": 14,
+            "altitud_msnm": 0,
             "tension": 220, "fases": 3, "tipo_control": "Un variador por bomba",
             "presion_trabajo": 4, "unidad_presion": "bar",
             "senal_sensor": "4-20 mA", "observaciones": "",
