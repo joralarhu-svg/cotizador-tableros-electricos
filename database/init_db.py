@@ -66,6 +66,10 @@ def crear_tablas_cotizaciones():
                 numero TEXT NOT NULL UNIQUE,
                 cliente_id INTEGER NOT NULL,
                 proyecto TEXT NOT NULL,
+                tipo_tablero TEXT NOT NULL DEFAULT 'Presión constante'
+                    CHECK (tipo_tablero IN (
+                        'Presión constante', 'Alternador', 'Contraincendio'
+                    )),
                 cantidad_bombas INTEGER NOT NULL CHECK (cantidad_bombas >= 1),
                 bombas_operacion INTEGER NOT NULL CHECK (bombas_operacion >= 1),
                 bombas_reserva INTEGER NOT NULL DEFAULT 0 CHECK (bombas_reserva >= 0),
@@ -115,6 +119,7 @@ def crear_estructura_comercial():
             fila["name"] for fila in conexion.execute("PRAGMA table_info(cotizaciones)")
         }
         nuevas_columnas = {
+            "tipo_tablero": "TEXT NOT NULL DEFAULT 'Presión constante'",
             "altitud_msnm": "REAL NOT NULL DEFAULT 0",
             "con_alarma": "INTEGER NOT NULL DEFAULT 0",
             "tipo_cambio": "REAL NOT NULL DEFAULT 3.50",
