@@ -16,7 +16,7 @@ class SeleccionComponentesTest(unittest.TestCase):
         os.environ.pop("COTIZADOR_DB_PATH", None)
         self.tempdir.cleanup()
 
-    def _crear_cotizacion(self):
+    def _crear_cotizacion(self, con_alarma=False):
         from modules.cotizaciones import registrar_cliente, registrar_cotizacion
         cliente = registrar_cliente({
             "tipo_documento": "RUC", "numero_documento": "20111111111",
@@ -29,7 +29,8 @@ class SeleccionComponentesTest(unittest.TestCase):
             "corriente_motor": 14.0, "tension": 220, "fases": 3,
             "altitud_msnm": 2000,
             "tipo_control": "Un variador por bomba", "presion_trabajo": 4.0,
-            "unidad_presion": "bar", "senal_sensor": "4-20 mA", "observaciones": "",
+            "unidad_presion": "bar", "con_alarma": con_alarma,
+            "observaciones": "",
         })
 
     def test_genera_requerimientos_segun_control(self):
@@ -38,7 +39,7 @@ class SeleccionComponentesTest(unittest.TestCase):
             "cantidad_bombas": 2, "tipo_control": "Un variador por bomba",
             "potencia_hp": 5.0, "corriente_motor": 14.0,
             "altitud_msnm": 2000, "tension": 220, "fases": 3,
-            "senal_sensor": "4-20 mA",
+            "con_alarma": False,
         }
         requerimientos = generar_requerimientos(cotizacion)
         self.assertEqual(requerimientos[0]["cantidad"], 2)
@@ -84,6 +85,10 @@ class SeleccionComponentesTest(unittest.TestCase):
             "Circuito de potencia - Cuadros de distribución",
             [item["grupo"] for item in requerimientos],
         )
+        self.assertFalse(any(
+            item["grupo"].startswith("Sistema de alarma")
+            for item in requerimientos
+        ))
 
     def test_calcula_derrateo_y_extrae_corriente(self):
         from modules.seleccion_componentes import (
@@ -571,6 +576,71 @@ class SeleccionComponentesTest(unittest.TestCase):
             ],
         }
         for grupo, codigos in esperados.items():
+            candidatos = buscar_candidatos(
+                requerimientos[grupo], cotizacion
+            )
+            self.assertEqual(candidatos["codigo"].tolist(), codigos)
+
+    def test_sistema_alarma_agrega_y_filtra_componentes_220v_na(self):
+        from modules.inventario import guardar_componentes
+        from modules.seleccion_componentes import (
+            buscar_candidatos, generar_requerimientos, obtener_cotizacion,
+        )
+        base = {
+            "unidad": "und", "stock": 5, "stock_minimo": 0,
+            "costo_unitario": 30, "corriente_nominal": 0,
+            "moneda": "PEN", "proveedor": "", "ubicacion": "",
+            "estado": "Activo", "observaciones": "", "marca": "Prueba",
+            "categoria": "Mando y señalización",
+        }
+        guardar_componentes(pd.DataFrame([
+            {
+                **base, "codigo": "SIR-220",
+                "descripcion": "Motor sirena roja 220V", "modelo": "S220",
+            },
+            {
+                **base, "codigo": "SIR-24",
+                "descripcion": "Sirena industrial 24VDC", "modelo": "S24",
+            },
+            {
+                **base, "codigo": "REL-220",
+                "descripcion": "Relé auxiliar enchufable bobina 220VAC",
+                "modelo": "R220",
+            },
+            {
+                **base, "codigo": "REL-24",
+                "descripcion": "Relé auxiliar enchufable bobina 24VDC",
+                "modelo": "R24",
+            },
+            {
+                **base, "codigo": "PUL-NA",
+                "descripcion": "Pulsador rasante verde 22mm 1NA",
+                "modelo": "PNA",
+            },
+            {
+                **base, "codigo": "PUL-NC",
+                "descripcion": "Pulsador rasante rojo 22mm 1NC",
+                "modelo": "PNC",
+            },
+            {
+                **base, "codigo": "CAB-NA",
+                "descripcion": "Cabezal pulsador verde 1NA",
+                "modelo": "CNA",
+            },
+        ]))
+        creada = self._crear_cotizacion(con_alarma=True)
+        cotizacion = obtener_cotizacion(creada["id"])
+        requerimientos = {
+            item["grupo"]: item
+            for item in generar_requerimientos(cotizacion)
+        }
+        esperados = {
+            "Sistema de alarma - Sirena 220 V": ["SIR-220"],
+            "Sistema de alarma - Relé auxiliar 220 V": ["REL-220"],
+            "Sistema de alarma - Pulsador NA": ["PUL-NA"],
+        }
+        for grupo, codigos in esperados.items():
+            self.assertEqual(requerimientos[grupo]["cantidad"], 1)
             candidatos = buscar_candidatos(
                 requerimientos[grupo], cotizacion
             )
