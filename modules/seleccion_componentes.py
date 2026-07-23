@@ -143,6 +143,34 @@ def cumple_polos_circuito_derivado(fila, polos_requeridos):
     return polos == int(polos_requeridos)
 
 
+def es_accesorio_puerta(fila, subtipo, color=None):
+    texto = _normalizar(
+        f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
+    )
+    if subtipo == "conmutador":
+        return (
+            "conmutador" in texto or "selector" in texto
+        ) and not any(
+            excluido in texto
+            for excluido in ["accesorio", "contacto auxiliar", "bloque de contacto"]
+        )
+    if subtipo != "piloto":
+        return False
+    es_piloto_completo = (
+        "piloto de senalizacion" in texto
+        or "piloto senalizacion" in texto
+        or "luz piloto" in texto
+    )
+    if not es_piloto_completo:
+        return False
+    colores = {
+        "verde": ["verde"],
+        "rojo": ["rojo", "roja"],
+        "ambar": ["ambar", "amarillo", "amarilla"],
+    }
+    return any(nombre in texto for nombre in colores.get(color, []))
+
+
 def obtener_cotizacion(cotizacion_id):
     conexion = obtener_conexion()
     try:
@@ -194,6 +222,62 @@ def generar_requerimientos(cotizacion):
                 f"Solo se muestran equipos con capacidad mínima de "
                 f"{corriente_bomba:.2f} A después del derrateo; los "
                 f"interruptores deben ser de {cotizacion['fases']} polos."
+            ),
+        },
+        {
+            "grupo": "Accesorios de puerta - Conmutadores",
+            "cantidad": total,
+            "palabras": ["conmutador", "selector"],
+            "criterio_corriente": None,
+            "tipo_componente": "accesorio_puerta",
+            "subtipo_accesorio": "conmutador",
+            "nota": (
+                f"Un conmutador o selector por bomba: {total} unidad(es)."
+            ),
+        },
+        {
+            "grupo": "Accesorios de puerta - Pilotos verdes",
+            "cantidad": total,
+            "palabras": [
+                "piloto de senalizacion verde", "piloto senalizacion verde"
+            ],
+            "criterio_corriente": None,
+            "tipo_componente": "accesorio_puerta",
+            "subtipo_accesorio": "piloto",
+            "color_requerido": "verde",
+            "nota": f"Un piloto verde por bomba: {total} unidad(es).",
+        },
+        {
+            "grupo": "Accesorios de puerta - Pilotos rojos",
+            "cantidad": total + 2,
+            "palabras": [
+                "piloto de senalizacion rojo", "piloto senalizacion rojo"
+            ],
+            "criterio_corriente": None,
+            "tipo_componente": "accesorio_puerta",
+            "subtipo_accesorio": "piloto",
+            "color_requerido": "rojo",
+            "nota": (
+                f"{total} piloto(s) rojo(s) para las bombas y 2 adicionales "
+                f"para bajo nivel de cisterna y sobrepresión: "
+                f"{total + 2} unidad(es)."
+            ),
+        },
+        {
+            "grupo": "Accesorios de puerta - Piloto ámbar",
+            "cantidad": 1,
+            "palabras": [
+                "piloto de senalizacion ambar",
+                "piloto de senalizacion amarillo",
+                "piloto senalizacion amarillo",
+            ],
+            "criterio_corriente": None,
+            "tipo_componente": "accesorio_puerta",
+            "subtipo_accesorio": "piloto",
+            "color_requerido": "ambar",
+            "nota": (
+                "Un piloto ámbar; también se reconocen las denominaciones "
+                "amarillo o amarilla del inventario."
             ),
         },
         {
@@ -339,6 +423,20 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
             componentes.apply(
                 lambda fila: cumple_polos_circuito_derivado(
                     fila, requerimiento["polos_requeridos"]
+                ),
+                axis=1,
+            )
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
+
+    if requerimiento.get("tipo_componente") == "accesorio_puerta":
+        componentes = componentes[
+            componentes.apply(
+                lambda fila: es_accesorio_puerta(
+                    fila,
+                    requerimiento["subtipo_accesorio"],
+                    requerimiento.get("color_requerido"),
                 ),
                 axis=1,
             )
