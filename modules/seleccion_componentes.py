@@ -24,7 +24,9 @@ def extraer_rango_corriente(texto):
     if rango:
         minimo, maximo = float(rango.group(1)), float(rango.group(2))
         return (min(minimo, maximo), max(minimo, maximo))
-    valores = re.findall(r"(\d+(?:\.\d+)?)\s*a\b", texto)
+    valores = re.findall(
+        r"(\d+(?:\.\d+)?)\s*(?:a|amp|amperios?)\b(?!\s+\d)", texto
+    )
     if valores:
         capacidad = max(float(valor) for valor in valores)
         return (capacidad, capacidad)
@@ -171,7 +173,7 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
     try:
         componentes = pd.read_sql_query(
             """SELECT id, codigo, descripcion, categoria, marca, modelo, unidad,
-            stock, stock_minimo, costo_unitario, moneda, estado
+            stock, stock_minimo, costo_unitario, corriente_nominal, moneda, estado
             FROM componentes WHERE estado = 'Activo'""",
             conexion,
         )
@@ -214,27 +216,27 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
     criterio = requerimiento.get("criterio_corriente")
     corriente_requerida = requerimiento.get("corriente_requerida")
     if criterio and corriente_requerida is not None:
-        candidatos["rango_corriente"] = candidatos.apply(
-            lambda fila: extraer_rango_corriente(
-                f"{fila['descripcion']} {fila['modelo']}"
+        candidatos["corriente_seleccion"] = candidatos.apply(
+            lambda fila: (
+                float(fila["corriente_nominal"])
+                if float(fila["corriente_nominal"] or 0) > 0
+                else (
+                    extraer_rango_corriente(
+                        f"{fila['descripcion']} {fila['modelo']}"
+                    ) or (0, 0)
+                )[1]
             ),
             axis=1,
         )
-        candidatos = candidatos[candidatos["rango_corriente"].notna()].copy()
-        if criterio == "rango":
-            candidatos = candidatos[
-                candidatos["rango_corriente"].map(
-                    lambda rango: rango[0] <= corriente_requerida <= rango[1]
-                )
-            ]
-        else:
-            candidatos = candidatos[
-                candidatos["rango_corriente"].map(
-                    lambda rango: rango[1] >= corriente_requerida
-                )
-            ]
+        candidatos = candidatos[
+            candidatos["corriente_seleccion"] >= corriente_requerida
+        ].copy()
         if candidatos.empty:
             return candidatos.reset_index(drop=True)
+        return candidatos.sort_values(
+            ["corriente_seleccion", "puntaje", "stock", "descripcion"],
+            ascending=[True, False, False, True],
+        ).head(limite).reset_index(drop=True)
     return candidatos.sort_values(
         ["puntaje", "stock", "descripcion"], ascending=[False, False, True]
     ).head(limite).reset_index(drop=True)
