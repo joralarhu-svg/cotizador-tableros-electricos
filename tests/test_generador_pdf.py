@@ -42,9 +42,10 @@ class GeneradorPdfTest(unittest.TestCase):
             "proyecto": "Sistema de presión constante",
             "tipo_tablero": "Contraincendio", "cantidad_bombas": 1,
             "potencia_hp": 5,
-            "corriente_motor": 14, "tension": 220, "fases": 3,
+            "corriente_motor": 14, "potencia_jockey_hp": 2,
+            "corriente_jockey": 6, "tension": 220, "fases": 3,
             "altitud_msnm": 2500,
-            "tipo_control": "Un variador por bomba", "presion_trabajo": 50,
+            "tipo_control": "Softstarter", "presion_trabajo": 1,
             "unidad_presion": "psi", "con_alarma": True,
             "observaciones": "",
         })
@@ -77,8 +78,9 @@ class GeneradorPdfTest(unittest.TestCase):
             texto = "\n".join(pagina.extract_text() or "" for pagina in documento.pages)
         self.assertIn("Integración del tablero eléctrico", texto)
         self.assertNotIn("Ingeniería y programación", texto)
-        self.assertIn("Sistema de alarma: incluido", texto)
         self.assertIn("Tablero para sistema contraincendio", texto)
+        self.assertIn("bomba jockey de 2 HP y 6 A", texto)
+        self.assertIn("Control: Softstarter", texto)
         self.assertNotIn("4-20 mA", texto)
 
 
