@@ -43,12 +43,18 @@ class SeleccionComponentesTest(unittest.TestCase):
         self.assertEqual(requerimientos[0]["cantidad"], 2)
         self.assertIn("Variadores", requerimientos[0]["grupo"])
         self.assertAlmostEqual(requerimientos[0]["corriente_requerida"], 15.4)
+        proteccion_general = requerimientos[1]
+        self.assertEqual(proteccion_general["grupo"], "Protección general")
+        self.assertAlmostEqual(proteccion_general["corriente_requerida"], 30.8)
+        self.assertEqual(requerimientos[2]["grupo"], "Circuitos derivados")
 
     def test_calcula_derrateo_y_extrae_corriente(self):
         from modules.seleccion_componentes import (
             calcular_corriente_corregida,
             calcular_factor_derrateo,
             extraer_rango_corriente,
+            extraer_rangos_tension,
+            admite_tension,
         )
         self.assertEqual(calcular_factor_derrateo(1000), 1.0)
         self.assertAlmostEqual(calcular_factor_derrateo(2500), 1.15)
@@ -59,6 +65,9 @@ class SeleccionComponentesTest(unittest.TestCase):
             extraer_rango_corriente("Soft Starter 208 a 600VAC 45AMP"),
             (45.0, 45.0),
         )
+        self.assertTrue(admite_tension("Variador entrada 200-240VAC", 220))
+        self.assertFalse(admite_tension("Variador trifásico 380V", 220))
+        self.assertIn((380.0, 380.0), extraer_rangos_tension("Equipo 380VAC"))
 
     def test_busca_y_guarda_componente(self):
         from modules.inventario import guardar_componentes
@@ -147,6 +156,46 @@ class SeleccionComponentesTest(unittest.TestCase):
         )
         self.assertTrue(candidatos.empty)
         self.assertIn("puntaje", candidatos.columns)
+
+    def test_variadores_filtra_tipo_y_tension(self):
+        from modules.inventario import guardar_componentes
+        from modules.seleccion_componentes import (
+            buscar_candidatos, generar_requerimientos, obtener_cotizacion,
+        )
+        base = {
+            "unidad": "und", "stock": 5, "stock_minimo": 0,
+            "costo_unitario": 500, "corriente_nominal": 18,
+            "moneda": "PEN", "proveedor": "", "ubicacion": "",
+            "estado": "Activo", "observaciones": "",
+        }
+        guardar_componentes(pd.DataFrame([
+            {
+                **base, "codigo": "VDF-220",
+                "descripcion": "Variador de frecuencia 5 HP 18A 220V",
+                "categoria": "Variadores", "marca": "A", "modelo": "V220",
+            },
+            {
+                **base, "codigo": "VDF-380",
+                "descripcion": "Variador de frecuencia 5 HP 18A 380V",
+                "categoria": "Variadores", "marca": "B", "modelo": "V380",
+            },
+            {
+                **base, "codigo": "CONT-220",
+                "descripcion": "Contactor para variador 18A 220V",
+                "categoria": "Contactores", "marca": "C", "modelo": "C18",
+            },
+            {
+                **base, "codigo": "SS-220",
+                "descripcion": "Arrancador suave 5 HP 18A 220V",
+                "categoria": "Arrancadores suaves", "marca": "D", "modelo": "SS18",
+            },
+        ]))
+        creada = self._crear_cotizacion()
+        cotizacion = obtener_cotizacion(creada["id"])
+        candidatos = buscar_candidatos(
+            generar_requerimientos(cotizacion)[0], cotizacion
+        )
+        self.assertEqual(candidatos["codigo"].tolist(), ["VDF-220"])
 
 
 if __name__ == "__main__":
