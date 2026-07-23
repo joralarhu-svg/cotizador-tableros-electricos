@@ -25,8 +25,14 @@ def extraer_rango_corriente(texto):
         minimo, maximo = float(rango.group(1)), float(rango.group(2))
         return (min(minimo, maximo), max(minimo, maximo))
     valores = re.findall(
-        r"(\d+(?:\.\d+)?)\s*(?:a|amp|amperios?)\b(?!\s+\d)", texto
+        r"(\d+(?:\.\d+)?)\s*(?:amp|amperios?)\b",
+        texto,
     )
+    valores.extend(re.findall(
+        r"(\d+(?:\.\d+)?)\s*a\b"
+        r"(?!\s+\d+(?:\.\d+)?\s*v(?:ac)?\b)",
+        texto,
+    ))
     if valores:
         capacidad = max(float(valor) for valor in valores)
         return (capacidad, capacidad)
@@ -70,21 +76,10 @@ def es_variador_frecuencia(fila):
     )
 
 
-def es_proteccion_circuito_derivado(fila):
+def clasificar_proteccion_circuito_derivado(fila):
     texto = _normalizar(
         f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
     )
-    tipos_admitidos = [
-        "guardamotor",
-        "guarda motor",
-        "interruptor termomagnetico",
-        "interruptor automatico",
-        "interruptor caja moldeada",
-        "disyuntor",
-        "breaker",
-        "mcb",
-        "mccb",
-    ]
     tipos_excluidos = [
         "contactor",
         "arrancador suave",
@@ -92,10 +87,27 @@ def es_proteccion_circuito_derivado(fila):
         "variador",
         "rele termico",
     ]
-    return (
-        any(tipo in texto for tipo in tipos_admitidos)
-        and not any(tipo in texto for tipo in tipos_excluidos)
-    )
+    if any(tipo in texto for tipo in tipos_excluidos):
+        return None
+    if "guardamotor" in texto or "guarda motor" in texto:
+        return "Guardamotor"
+    tipos_interruptor = [
+        "interruptor termomagnetico",
+        "interruptor magnetotermico",
+        "interruptor automatico",
+        "interruptor caja moldeada",
+        "disyuntor",
+        "breaker",
+        "mcb",
+        "mccb",
+    ]
+    if any(tipo in texto for tipo in tipos_interruptor):
+        return "Interruptor termomagnético"
+    return None
+
+
+def es_proteccion_circuito_derivado(fila):
+    return clasificar_proteccion_circuito_derivado(fila) is not None
 
 
 def obtener_cotizacion(cotizacion_id):
@@ -136,8 +148,9 @@ def generar_requerimientos(cotizacion):
             "cantidad": total,
             "palabras": [
                 "interruptor termomagnetico", "interruptor automatico",
-                "interruptor caja moldeada", "guarda motor", "guardamotor",
-                "disyuntor", "breaker", "mcb", "mccb",
+                "interruptor magnetotermico", "interruptor caja moldeada",
+                "guarda motor", "guardamotor", "disyuntor", "breaker",
+                "mcb", "mccb",
             ],
             "corriente_requerida": corriente_bomba,
             "criterio_corriente": "minima",
@@ -339,10 +352,40 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
         ].copy()
         if candidatos.empty:
             return candidatos.reset_index(drop=True)
-        return candidatos.sort_values(
+        candidatos = candidatos.sort_values(
             ["corriente_seleccion", "puntaje", "stock", "descripcion"],
             ascending=[True, False, False, True],
-        ).head(limite).reset_index(drop=True)
+        )
+        if (
+            requerimiento.get("tipo_componente")
+            == "proteccion_circuito_derivado"
+        ):
+            candidatos["tipo_proteccion"] = candidatos.apply(
+                clasificar_proteccion_circuito_derivado, axis=1
+            )
+            candidatos = pd.concat(
+                [
+                    candidatos[
+                        candidatos["tipo_proteccion"] == tipo
+                    ].head(limite)
+                    for tipo in [
+                        "Guardamotor",
+                        "Interruptor termomagnético",
+                    ]
+                ],
+                ignore_index=True,
+            )
+            return candidatos.sort_values(
+                [
+                    "tipo_proteccion",
+                    "corriente_seleccion",
+                    "puntaje",
+                    "stock",
+                    "descripcion",
+                ],
+                ascending=[True, True, False, False, True],
+            ).reset_index(drop=True)
+        return candidatos.head(limite).reset_index(drop=True)
     return candidatos.sort_values(
         ["puntaje", "stock", "descripcion"], ascending=[False, False, True]
     ).head(limite).reset_index(drop=True)
@@ -385,18 +428,3 @@ def guardar_seleccion(cotizacion_id, selecciones):
 
 
 def obtener_detalle_cotizacion(cotizacion_id):
-    conexion = obtener_conexion()
-    try:
-        return pd.read_sql_query(
-            """SELECT d.id, c.codigo, c.descripcion, c.marca, d.cantidad,
-            c.stock, d.costo_unitario, d.margen, d.precio_unitario,
-            d.cantidad * d.precio_unitario AS subtotal, c.moneda,
-            d.observaciones
-            FROM detalle_cotizacion d
-            JOIN componentes c ON c.id = d.componente_id
-            WHERE d.cotizacion_id = ? ORDER BY c.categoria, c.descripcion""",
-            conexion,
-            params=(cotizacion_id,),
-        )
-    finally:
-        conexion.close()
