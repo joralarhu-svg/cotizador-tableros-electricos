@@ -204,17 +204,33 @@ def generar_pdf_cotizacion(cotizacion_id):
         cot["corriente_motor"], cot["altitud_msnm"]
     )
     tipo_tablero = cot.get("tipo_tablero", "Presión constante")
-    especificacion = (
-        f"Tablero para sistema {tipo_tablero.lower()} con {cot['cantidad_bombas']} bomba(s) "
-        f"disponibles para operación alternada. Motores de {cot['potencia_hp']:g} HP, "
-        f"{cot['corriente_motor']:g} A, {cot['tension']} V, {cot['fases']} fase(s). "
-        f"Altitud: {cot['altitud_msnm']:g} msnm; factor de derrateo {factor_derrateo:.3f}; "
-        f"corriente corregida por bomba {corriente_corregida:.2f} A. "
-        f"Control: {cot['tipo_control']}. Presión de trabajo: "
-        f"{cot['presion_trabajo']:g} {cot['unidad_presion']}. "
-        f"Sistema de alarma: "
-        f"{'incluido' if cot.get('con_alarma', 0) else 'no incluido'}."
-    )
+    if tipo_tablero == "Contraincendio":
+        corriente_jockey_corregida = calcular_corriente_corregida(
+            cot.get("corriente_jockey", 0), cot["altitud_msnm"]
+        )
+        especificacion = (
+            f"Tablero para sistema contraincendio. Bomba principal de "
+            f"{cot['potencia_hp']:g} HP y {cot['corriente_motor']:g} A; bomba jockey de "
+            f"{cot.get('potencia_jockey_hp', 0):g} HP y "
+            f"{cot.get('corriente_jockey', 0):g} A. Tensión de trabajo: "
+            f"{cot['tension']} V. Altitud: {cot['altitud_msnm']:g} msnm; "
+            f"factor de derrateo {factor_derrateo:.3f}; corrientes corregidas: "
+            f"principal {corriente_corregida:.2f} A y jockey "
+            f"{corriente_jockey_corregida:.2f} A. Control: {cot['tipo_control']}."
+        )
+    else:
+        especificacion = (
+            f"Tablero para sistema {tipo_tablero.lower()} con "
+            f"{cot['cantidad_bombas']} bomba(s) disponibles para operación alternada. "
+            f"Motores de {cot['potencia_hp']:g} HP, {cot['corriente_motor']:g} A, "
+            f"{cot['tension']} V, {cot['fases']} fase(s). Altitud: "
+            f"{cot['altitud_msnm']:g} msnm; factor de derrateo "
+            f"{factor_derrateo:.3f}; corriente corregida por bomba "
+            f"{corriente_corregida:.2f} A. Control: {cot['tipo_control']}. "
+            f"Presión de trabajo: {cot['presion_trabajo']:g} "
+            f"{cot['unidad_presion']}. Sistema de alarma: "
+            f"{'incluido' if cot.get('con_alarma', 0) else 'no incluido'}."
+        )
     historia.extend([Paragraph(especificacion, normal), Paragraph("DETALLE ECONÓMICO", subtitulo)])
 
     filas = [[_texto("Ítem", pequeno), _texto("Código", pequeno), _texto("Descripción", pequeno),
