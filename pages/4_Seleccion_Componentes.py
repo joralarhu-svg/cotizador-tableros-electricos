@@ -69,13 +69,6 @@ st.caption(
     f"Control: {cotizacion['tipo_control']} · {alarma}"
 )
 
-if cotizacion.get("tipo_tablero") == "Contraincendio":
-    st.info(
-        "Los datos contraincendio están registrados. La selección automática de "
-        "componentes se habilitará cuando se definan sus reglas técnicas específicas."
-    )
-    st.stop()
-
 requerimientos = generar_requerimientos(cotizacion)
 selecciones = []
 
