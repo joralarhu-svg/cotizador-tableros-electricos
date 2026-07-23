@@ -771,6 +771,18 @@ class SeleccionComponentesTest(unittest.TestCase):
         for grupo, cantidad in cantidades.items():
             self.assertEqual(requerimientos[grupo]["cantidad"], cantidad)
 
+        cotizacion["corriente_jockey"] = 14
+        requerimientos_aproximados = {
+            item["grupo"]: item
+            for item in generar_requerimientos(cotizacion)
+        }
+        rele_aproximado = buscar_candidatos(
+            requerimientos_aproximados["Relé térmico de bomba jockey"],
+            cotizacion,
+        )
+        self.assertEqual(rele_aproximado["codigo"].tolist(), ["REL-9-13"])
+        self.assertGreater(rele_aproximado.iloc[0]["distancia_corriente"], 0)
+
     def test_contraincendio_estrella_triangulo_espera_reglas_especificas(self):
         from modules.seleccion_componentes import generar_requerimientos
 
