@@ -143,6 +143,15 @@ def cumple_polos_circuito_derivado(fila, polos_requeridos):
     return polos == int(polos_requeridos)
 
 
+def es_interruptor_trifasico(fila):
+    if clasificar_proteccion_circuito_derivado(fila) != "Interruptor termomagnético":
+        return False
+    polos = extraer_numero_polos(
+        f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
+    )
+    return polos == 3
+
+
 def es_accesorio_puerta(fila, subtipo, color=None):
     texto = _normalizar(
         f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
@@ -153,6 +162,15 @@ def es_accesorio_puerta(fila, subtipo, color=None):
         ) and not any(
             excluido in texto
             for excluido in ["accesorio", "contacto auxiliar", "bloque de contacto"]
+        )
+    if subtipo in ("pulsador_na", "pulsador_nc"):
+        es_pulsador = "pulsador" in texto and "cabezal" not in texto
+        contacto = "na" if subtipo == "pulsador_na" else "nc"
+        nombre = "abierto" if contacto == "na" else "cerrado"
+        return es_pulsador and (
+            bool(re.search(rf"\b\d*\s*{contacto}\b", texto))
+            or f"normalmente {nombre}" in texto
+            or f"normal {nombre}" in texto
         )
     if subtipo != "piloto":
         return False
@@ -269,7 +287,111 @@ def obtener_cotizacion(cotizacion_id):
         conexion.close()
 
 
+def generar_requerimientos_contraincendio(cotizacion):
+    altitud = cotizacion.get("altitud_msnm", 0)
+    corriente_principal = calcular_corriente_corregida(
+        cotizacion["corriente_motor"], altitud
+    )
+    corriente_jockey = calcular_corriente_corregida(
+        cotizacion.get("corriente_jockey", 0), altitud
+    )
+    corriente_general = corriente_principal + corriente_jockey
+    requerimientos = [
+        {
+            "grupo": "Protección general contraincendio",
+            "cantidad": 1,
+            "palabras": [
+                "interruptor termomagnetico", "interruptor automatico",
+                "interruptor caja moldeada", "disyuntor", "breaker", "mccb",
+            ],
+            "corriente_requerida": corriente_general,
+            "criterio_corriente": "minima",
+            "tipo_componente": "interruptor_trifasico",
+            "nota": (
+                f"Interruptor general trifásico: mínimo {corriente_general:.2f} A, "
+                f"suma de la bomba principal ({corriente_principal:.2f} A) y "
+                f"la bomba jockey ({corriente_jockey:.2f} A), ambas derrateadas."
+            ),
+        },
+        {
+            "grupo": "Protección trifásica de bomba jockey",
+            "cantidad": 1,
+            "palabras": [
+                "interruptor termomagnetico", "interruptor automatico",
+                "interruptor caja moldeada", "disyuntor", "breaker", "mcb", "mccb",
+            ],
+            "corriente_requerida": corriente_jockey,
+            "criterio_corriente": "minima",
+            "tipo_componente": "interruptor_trifasico",
+            "nota": (
+                f"Interruptor trifásico para arranque directo de la bomba jockey: "
+                f"mínimo {corriente_jockey:.2f} A derrateados."
+            ),
+        },
+        {
+            "grupo": "Contactor de bomba jockey",
+            "cantidad": 1,
+            "palabras": ["contactor"],
+            "corriente_requerida": corriente_jockey,
+            "criterio_corriente": "minima",
+            "tipo_componente": "contactor",
+            "nota": (
+                f"Un contactor para arranque directo de la bomba jockey, "
+                f"mínimo {corriente_jockey:.2f} A."
+            ),
+        },
+        {
+            "grupo": "Relé térmico de bomba jockey",
+            "cantidad": 1,
+            "palabras": ["rele termico", "rele de sobrecarga"],
+            "corriente_requerida": corriente_jockey,
+            "criterio_corriente": "rango",
+            "tipo_componente": "rele_termico",
+            "nota": (
+                f"Un relé térmico cuyo rango incluya la corriente derrateada "
+                f"de la bomba jockey: {corriente_jockey:.2f} A."
+            ),
+        },
+    ]
+    accesorios = [
+        ("Accesorios de puerta - Piloto amarillo", 1, "piloto", "ambar",
+         ["piloto de senalizacion amarillo", "piloto senalizacion amarillo"]),
+        ("Accesorios de puerta - Pilotos verdes", 2, "piloto", "verde",
+         ["piloto de senalizacion verde", "piloto senalizacion verde"]),
+        ("Accesorios de puerta - Pilotos rojos", 3, "piloto", "rojo",
+         ["piloto de senalizacion rojo", "piloto senalizacion rojo"]),
+        ("Accesorios de puerta - Conmutador", 1, "conmutador", None,
+         ["conmutador", "selector"]),
+        ("Accesorios de puerta - Pulsador NA", 1, "pulsador_na", None,
+         ["pulsador"]),
+        ("Accesorios de puerta - Pulsador NC", 1, "pulsador_nc", None,
+         ["pulsador"]),
+    ]
+    for grupo, cantidad, subtipo, color, palabras in accesorios:
+        requerimientos.append({
+            "grupo": grupo,
+            "cantidad": cantidad,
+            "palabras": palabras,
+            "criterio_corriente": None,
+            "tipo_componente": "accesorio_puerta",
+            "subtipo_accesorio": subtipo,
+            "color_requerido": color,
+            "nota": f"{cantidad} unidad(es) para señalización y mando en puerta.",
+        })
+
+    for requerimiento in requerimientos:
+        if requerimiento.get("criterio_corriente") == "minima":
+            requerimiento["nota"] += (
+                " Se muestran únicamente los dos calibres superiores más "
+                "cercanos a la corriente requerida."
+            )
+    return requerimientos
+
+
 def generar_requerimientos(cotizacion):
+    if cotizacion.get("tipo_tablero") == "Contraincendio":
+        return generar_requerimientos_contraincendio(cotizacion)
+
     total = int(cotizacion["cantidad_bombas"])
     tipo_control = cotizacion["tipo_control"]
     cantidad_variadores = (
@@ -631,6 +753,43 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
         if componentes.empty:
             return componentes.reset_index(drop=True)
 
+    if requerimiento.get("tipo_componente") == "interruptor_trifasico":
+        componentes = componentes[
+            componentes.apply(es_interruptor_trifasico, axis=1)
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
+
+    if requerimiento.get("tipo_componente") == "contactor":
+        componentes = componentes[
+            componentes.apply(
+                lambda fila: (
+                    "contactor" in _normalizar(
+                        f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
+                    )
+                    and "auxiliar" not in _normalizar(fila["descripcion"])
+                ),
+                axis=1,
+            )
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
+
+    if requerimiento.get("tipo_componente") == "rele_termico":
+        componentes = componentes[
+            componentes.apply(
+                lambda fila: any(
+                    nombre in _normalizar(
+                        f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
+                    )
+                    for nombre in ["rele termico", "rele de sobrecarga"]
+                ),
+                axis=1,
+            )
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
+
     if requerimiento.get("tipo_componente") == "accesorio_puerta":
         componentes = componentes[
             componentes.apply(
@@ -698,6 +857,30 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
     criterio = requerimiento.get("criterio_corriente")
     corriente_requerida = requerimiento.get("corriente_requerida")
     if criterio and corriente_requerida is not None:
+        if criterio == "rango":
+            candidatos["rango_corriente"] = candidatos.apply(
+                lambda fila: extraer_rango_corriente(
+                    f"{fila['descripcion']} {fila['modelo']}"
+                ),
+                axis=1,
+            )
+            candidatos = candidatos[
+                candidatos["rango_corriente"].apply(
+                    lambda rango: (
+                        rango is not None
+                        and rango[0] <= corriente_requerida <= rango[1]
+                    )
+                )
+            ].copy()
+            if candidatos.empty:
+                return candidatos.reset_index(drop=True)
+            candidatos["corriente_seleccion"] = candidatos[
+                "rango_corriente"
+            ].apply(lambda rango: rango[1])
+            return candidatos.sort_values(
+                ["corriente_seleccion", "puntaje", "stock", "descripcion"],
+                ascending=[True, False, False, True],
+            ).head(limite).reset_index(drop=True)
         candidatos["corriente_seleccion"] = candidatos.apply(
             lambda fila: (
                 float(fila["corriente_nominal"])
