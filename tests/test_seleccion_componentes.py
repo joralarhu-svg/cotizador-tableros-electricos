@@ -173,6 +173,14 @@ class SeleccionComponentesTest(unittest.TestCase):
                 "moneda": "PEN", "proveedor": "", "ubicacion": "",
                 "estado": "Activo", "observaciones": "",
             },
+            {
+                "codigo": "VDF-32A", "descripcion": "Variador 5 HP 32A 220V",
+                "categoria": "Variadores", "marca": "D", "modelo": "",
+                "unidad": "und", "stock": 5, "stock_minimo": 0,
+                "costo_unitario": 800, "corriente_nominal": 32,
+                "moneda": "PEN", "proveedor": "", "ubicacion": "",
+                "estado": "Activo", "observaciones": "",
+            },
         ]))
         creada = self._crear_cotizacion()
         cotizacion = obtener_cotizacion(creada["id"])
@@ -181,6 +189,9 @@ class SeleccionComponentesTest(unittest.TestCase):
         )
         self.assertEqual(candidatos["codigo"].tolist(), ["VDF-18A", "VDF-25A"])
         self.assertEqual(candidatos.iloc[0]["corriente_seleccion"], 18)
+        self.assertEqual(
+            candidatos["corriente_seleccion"].nunique(), 2
+        )
 
     def test_sin_capacidad_suficiente_devuelve_lista_vacia(self):
         from modules.inventario import guardar_componentes
@@ -502,6 +513,18 @@ class SeleccionComponentesTest(unittest.TestCase):
                 "categoria": "Distribución", "modelo": "D63",
                 "corriente_nominal": 63,
             },
+            {
+                **base, "codigo": "DIST-80A",
+                "descripcion": "Bloque repartidor de potencia 4 polos 80A",
+                "categoria": "Distribución", "modelo": "D80",
+                "corriente_nominal": 80,
+            },
+            {
+                **base, "codigo": "DIST-100A",
+                "descripcion": "Bloque de distribución 4 polos 100A",
+                "categoria": "Distribución", "modelo": "D100",
+                "corriente_nominal": 100,
+            },
         ]))
         cliente = registrar_cliente({
             "tipo_documento": "RUC", "numero_documento": "20999999999",
@@ -543,7 +566,9 @@ class SeleccionComponentesTest(unittest.TestCase):
             "Circuito de control - Fusibles": ["FUS-10A"],
             "Circuito de control - Portafusibles": ["PF-10X38"],
             "Circuito de control - Relés auxiliares 24 VDC": ["REL-24DC"],
-            "Circuito de potencia - Cuadros de distribución": ["DIST-63A"],
+            "Circuito de potencia - Cuadros de distribución": [
+                "DIST-63A", "DIST-80A"
+            ],
         }
         for grupo, codigos in esperados.items():
             candidatos = buscar_candidatos(
