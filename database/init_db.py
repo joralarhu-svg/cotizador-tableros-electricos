@@ -78,6 +78,8 @@ def crear_tablas_cotizaciones():
                 unidad_presion TEXT NOT NULL DEFAULT 'bar'
                     CHECK (unidad_presion IN ('bar', 'psi', 'mca')),
                 senal_sensor TEXT NOT NULL DEFAULT '4-20 mA',
+                con_alarma INTEGER NOT NULL DEFAULT 0
+                    CHECK (con_alarma IN (0, 1)),
                 observaciones TEXT,
                 estado TEXT NOT NULL DEFAULT 'Borrador'
                     CHECK (estado IN ('Borrador', 'Emitida', 'Aprobada', 'Rechazada')),
@@ -114,6 +116,7 @@ def crear_estructura_comercial():
         }
         nuevas_columnas = {
             "altitud_msnm": "REAL NOT NULL DEFAULT 0",
+            "con_alarma": "INTEGER NOT NULL DEFAULT 0",
             "tipo_cambio": "REAL NOT NULL DEFAULT 3.50",
             "descuento_porcentaje": "REAL NOT NULL DEFAULT 0",
             "igv_porcentaje": "REAL NOT NULL DEFAULT 18",
