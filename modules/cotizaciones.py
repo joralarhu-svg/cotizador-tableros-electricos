@@ -69,12 +69,26 @@ def generar_numero_cotizacion(conexion):
 
 def validar_datos_tecnicos(datos):
     errores = []
-    if datos.get("tipo_tablero", "Presión constante") not in TIPOS_TABLERO:
+    tipo_tablero = datos.get("tipo_tablero", "Presión constante")
+    if tipo_tablero not in TIPOS_TABLERO:
         errores.append("El tipo de tablero seleccionado no es válido.")
     if datos["cantidad_bombas"] < 1:
         errores.append("La cantidad de bombas debe ser mayor que cero.")
     if datos["potencia_hp"] <= 0 or datos["corriente_motor"] <= 0:
         errores.append("La potencia y la corriente del motor deben ser mayores que cero.")
+    if tipo_tablero == "Contraincendio":
+        if (
+            datos.get("potencia_jockey_hp", 0) <= 0
+            or datos.get("corriente_jockey", 0) <= 0
+        ):
+            errores.append(
+                "La potencia y la corriente de la bomba jockey deben ser mayores que cero."
+            )
+        if datos.get("tipo_control") not in ("Estrella-triángulo", "Softstarter"):
+            errores.append(
+                "El tablero contraincendio solo admite control "
+                "Estrella-triángulo o Softstarter."
+            )
     if datos.get("altitud_msnm", 0) < 0:
         errores.append("La altitud de operación no puede ser negativa.")
     if datos["presion_trabajo"] <= 0:
@@ -92,14 +106,17 @@ def registrar_cotizacion(cliente_id, datos):
         cursor = conexion.execute(
             """INSERT INTO cotizaciones (
             numero, cliente_id, proyecto, tipo_tablero, cantidad_bombas, bombas_operacion,
-            bombas_reserva, potencia_hp, corriente_motor, tension, fases,
+            bombas_reserva, potencia_hp, corriente_motor, potencia_jockey_hp,
+            corriente_jockey, tension, fases,
             tipo_control, presion_trabajo, unidad_presion, con_alarma,
             observaciones, altitud_msnm, estado)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Borrador')""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    'Borrador')""",
             (numero, cliente_id, datos["proyecto"].strip(),
              datos.get("tipo_tablero", "Presión constante"), datos["cantidad_bombas"],
              datos["cantidad_bombas"], 0, datos["potencia_hp"],
-             datos["corriente_motor"], datos["tension"], datos["fases"],
+             datos["corriente_motor"], datos.get("potencia_jockey_hp", 0),
+             datos.get("corriente_jockey", 0), datos["tension"], datos["fases"],
              datos["tipo_control"], datos["presion_trabajo"], datos["unidad_presion"],
              int(bool(datos.get("con_alarma", False))),
              datos.get("observaciones", "").strip(),
@@ -121,6 +138,7 @@ def obtener_cotizaciones():
             """SELECT c.id, c.numero, cl.razon_social AS cliente, c.proyecto,
             c.tipo_tablero,
             c.cantidad_bombas, c.potencia_hp, c.corriente_motor,
+            c.potencia_jockey_hp, c.corriente_jockey,
             c.altitud_msnm, c.tension, c.tipo_control,
             c.presion_trabajo, c.unidad_presion, c.con_alarma,
             c.estado, c.fecha_creacion
