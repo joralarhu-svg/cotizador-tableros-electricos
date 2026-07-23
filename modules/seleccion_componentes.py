@@ -390,7 +390,9 @@ def generar_requerimientos_contraincendio(cotizacion):
 
 def generar_requerimientos(cotizacion):
     if cotizacion.get("tipo_tablero") == "Contraincendio":
-        return generar_requerimientos_contraincendio(cotizacion)
+        if cotizacion.get("tipo_control") == "Softstarter":
+            return generar_requerimientos_contraincendio(cotizacion)
+        return []
 
     total = int(cotizacion["cantidad_bombas"])
     tipo_control = cotizacion["tipo_control"]
