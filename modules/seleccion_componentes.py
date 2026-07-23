@@ -33,6 +33,43 @@ def extraer_rango_corriente(texto):
     return None
 
 
+def extraer_rangos_tension(texto):
+    texto = _normalizar(texto).replace(",", ".")
+    rangos = []
+    for minimo, maximo in re.findall(
+        r"(\d+(?:\.\d+)?)(?:\s*-\s*|\s+(?:a|hasta)\s+)"
+        r"(\d+(?:\.\d+)?)\s*v(?:ac)?\b",
+        texto,
+    ):
+        valores = sorted((float(minimo), float(maximo)))
+        rangos.append((valores[0], valores[1]))
+    for valor in re.findall(r"(\d+(?:\.\d+)?)\s*v(?:ac)?\b", texto):
+        tension = float(valor)
+        rangos.append((tension, tension))
+    return rangos
+
+
+def admite_tension(texto, tension_requerida):
+    return any(
+        minimo <= float(tension_requerida) <= maximo
+        for minimo, maximo in extraer_rangos_tension(texto)
+    )
+
+
+def es_variador_frecuencia(fila):
+    descripcion = _normalizar(fila["descripcion"])
+    categoria = _normalizar(fila["categoria"])
+    texto = f"{descripcion} {categoria}"
+    excluidos = [
+        "contactor", "arrancador suave", "soft starter",
+        "guardamotor", "guarda motor", "rele termico",
+    ]
+    return (
+        ("variador" in descripcion or "variador" in categoria)
+        and not any(excluido in texto for excluido in excluidos)
+    )
+
+
 def obtener_cotizacion(cotizacion_id):
     conexion = obtener_conexion()
     try:
@@ -61,15 +98,23 @@ def generar_requerimientos(cotizacion):
             "palabras": ["interruptor termomagnetico", "interruptor caja moldeada"],
             "corriente_requerida": corriente_bomba * total,
             "criterio_corriente": "minima",
-            "nota": "Protección principal del tablero; verificar poder de corte y corriente total.",
+            "nota": (
+                f"Protección principal: mínimo {corriente_bomba * total:.2f} A, "
+                f"calculado con {total} bomba(s) y corriente derrateada."
+            ),
         },
         {
-            "grupo": "Protección de motores",
+            "grupo": "Circuitos derivados",
             "cantidad": total,
-            "palabras": ["guarda motor", "guardamotor", "rele termico"],
+            "palabras": [
+                "interruptor termomagnetico", "guarda motor", "guardamotor"
+            ],
             "corriente_requerida": corriente_bomba,
-            "criterio_corriente": "rango",
-            "nota": "Una protección por motor; confirmar rango con la corriente nominal.",
+            "criterio_corriente": "minima",
+            "nota": (
+                f"Un interruptor o guardamotor por variador, mínimo "
+                f"{corriente_bomba:.2f} A."
+            ),
         },
         {
             "grupo": "Control automático",
@@ -108,6 +153,8 @@ def generar_requerimientos(cotizacion):
             "palabras": ["variador"],
             "corriente_requerida": corriente_bomba,
             "criterio_corriente": "minima",
+            "tipo_componente": "variador",
+            "tension_requerida": int(cotizacion["tension"]),
             "nota": (
                 f"Un variador por bomba, mínimo {corriente_bomba:.2f} A después "
                 f"del derrateo, {cotizacion['tension']} V."
@@ -120,6 +167,8 @@ def generar_requerimientos(cotizacion):
             "palabras": ["variador"],
             "corriente_requerida": corriente_bomba,
             "criterio_corriente": "minima",
+            "tipo_componente": "variador",
+            "tension_requerida": int(cotizacion["tension"]),
             "nota": (
                 f"Variador compartido, mínimo {corriente_bomba:.2f} A después "
                 f"del derrateo, {cotizacion['tension']} V."
@@ -186,6 +235,24 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
     potencia = float(cotizacion["potencia_hp"])
     tension = int(cotizacion["tension"])
     palabras = [_normalizar(p) for p in requerimiento["palabras"]]
+
+    if requerimiento.get("tipo_componente") == "variador":
+        componentes = componentes[
+            componentes.apply(es_variador_frecuencia, axis=1)
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
+        componentes = componentes[
+            componentes.apply(
+                lambda fila: admite_tension(
+                    f"{fila['descripcion']} {fila['modelo']}",
+                    requerimiento["tension_requerida"],
+                ),
+                axis=1,
+            )
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
 
     def puntuar(fila):
         texto = _normalizar(
