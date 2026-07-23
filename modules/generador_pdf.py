@@ -203,8 +203,9 @@ def generar_pdf_cotizacion(cotizacion_id):
     corriente_corregida = calcular_corriente_corregida(
         cot["corriente_motor"], cot["altitud_msnm"]
     )
+    tipo_tablero = cot.get("tipo_tablero", "Presión constante")
     especificacion = (
-        f"Tablero para sistema de presión constante con {cot['cantidad_bombas']} bomba(s) "
+        f"Tablero para sistema {tipo_tablero.lower()} con {cot['cantidad_bombas']} bomba(s) "
         f"disponibles para operación alternada. Motores de {cot['potencia_hp']:g} HP, "
         f"{cot['corriente_motor']:g} A, {cot['tension']} V, {cot['fases']} fase(s). "
         f"Altitud: {cot['altitud_msnm']:g} msnm; factor de derrateo {factor_derrateo:.3f}; "
