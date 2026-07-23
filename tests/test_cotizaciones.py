@@ -26,7 +26,8 @@ class CotizacionesTest(unittest.TestCase):
             "telefono": "", "correo": "", "direccion": "",
         })
         resultado = registrar_cotizacion(cliente_id, {
-            "proyecto": "Sistema de presión constante", "cantidad_bombas": 2,
+            "proyecto": "Sistema de presión constante",
+            "tipo_tablero": "Alternador", "cantidad_bombas": 2,
             "potencia_hp": 5.0,
             "corriente_motor": 14.0, "tension": 220, "fases": 3,
             "altitud_msnm": 2500,
@@ -39,6 +40,7 @@ class CotizacionesTest(unittest.TestCase):
         cotizaciones = obtener_cotizaciones()
         self.assertEqual(len(cotizaciones), 1)
         self.assertEqual(int(cotizaciones.iloc[0]["con_alarma"]), 1)
+        self.assertEqual(cotizaciones.iloc[0]["tipo_tablero"], "Alternador")
 
     def test_rechaza_altitud_negativa(self):
         from modules.cotizaciones import validar_datos_tecnicos
@@ -47,6 +49,19 @@ class CotizacionesTest(unittest.TestCase):
             "potencia_hp": 5.0, "corriente_motor": 14.0, "presion_trabajo": 4.0,
         })
         self.assertTrue(errores)
+
+    def test_rechaza_tipo_de_tablero_invalido(self):
+        from modules.cotizaciones import validar_datos_tecnicos
+
+        errores = validar_datos_tecnicos({
+            "tipo_tablero": "Otro",
+            "cantidad_bombas": 2,
+            "potencia_hp": 5,
+            "corriente_motor": 14,
+            "altitud_msnm": 0,
+            "presion_trabajo": 4,
+        })
+        self.assertIn("El tipo de tablero seleccionado no es válido.", errores)
 
     def test_eliminar_cotizacion_borra_relaciones_y_conserva_cliente(self):
         from modules.cotizaciones import (
