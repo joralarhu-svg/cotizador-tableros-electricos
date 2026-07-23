@@ -39,7 +39,8 @@ class GeneradorPdfTest(unittest.TestCase):
             "telefono": "999999999", "correo": "cliente@empresa.com", "direccion": "Lima",
         })
         cot = registrar_cotizacion(cliente_id, {
-            "proyecto": "Sistema de presión constante", "cantidad_bombas": 1,
+            "proyecto": "Sistema de presión constante",
+            "tipo_tablero": "Contraincendio", "cantidad_bombas": 1,
             "potencia_hp": 5,
             "corriente_motor": 14, "tension": 220, "fases": 3,
             "altitud_msnm": 2500,
@@ -77,6 +78,7 @@ class GeneradorPdfTest(unittest.TestCase):
         self.assertIn("Integración del tablero eléctrico", texto)
         self.assertNotIn("Ingeniería y programación", texto)
         self.assertIn("Sistema de alarma: incluido", texto)
+        self.assertIn("Tablero para sistema contraincendio", texto)
         self.assertNotIn("4-20 mA", texto)
 
 
