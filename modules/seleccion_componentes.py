@@ -171,6 +171,55 @@ def es_accesorio_puerta(fila, subtipo, color=None):
     return any(nombre in texto for nombre in colores.get(color, []))
 
 
+def es_componente_circuito_control(fila, subtipo):
+    texto = _normalizar(
+        f"{fila['descripcion']} {fila['categoria']} {fila['modelo']}"
+    )
+    if subtipo == "fusible":
+        return (
+            "fusible" in texto
+            and not any(
+                nombre in texto
+                for nombre in [
+                    "portafusible", "porta fusible", "base para fusible"
+                ]
+            )
+        )
+    if subtipo == "portafusible":
+        return any(
+            nombre in texto
+            for nombre in [
+                "portafusible", "porta fusible", "base para fusible"
+            ]
+        )
+    if subtipo == "rele_auxiliar_24vdc":
+        es_rele_auxiliar = any(
+            nombre in texto
+            for nombre in [
+                "rele auxiliar", "rele enchufable", "rele interfaz"
+            ]
+        )
+        es_24vdc = bool(re.search(r"\b24\s*v\s*dc\b", texto))
+        return (
+            es_rele_auxiliar
+            and es_24vdc
+            and "rele programable" not in texto
+            and "base de rele" not in texto
+        )
+    if subtipo == "distribucion":
+        return any(
+            nombre in texto
+            for nombre in [
+                "cuadro de distribucion",
+                "bloque de distribucion",
+                "bloque repartidor",
+                "repartidor de potencia",
+                "distribuidor de potencia",
+            ]
+        )
+    return False
+
+
 def obtener_cotizacion(cotizacion_id):
     conexion = obtener_conexion()
     try:
@@ -189,9 +238,15 @@ def obtener_cotizacion(cotizacion_id):
 def generar_requerimientos(cotizacion):
     total = int(cotizacion["cantidad_bombas"])
     tipo_control = cotizacion["tipo_control"]
+    cantidad_variadores = (
+        total if tipo_control == "Un variador por bomba"
+        else 1 if tipo_control == "Un variador compartido"
+        else 0
+    )
     corriente_bomba = calcular_corriente_corregida(
         cotizacion["corriente_motor"], cotizacion.get("altitud_msnm", 0)
     )
+    corriente_general = corriente_bomba * total
     requerimientos = [
         {
             "grupo": "Protección general",
@@ -281,6 +336,26 @@ def generar_requerimientos(cotizacion):
             ),
         },
         {
+            "grupo": "Circuito de control - Fusibles",
+            "cantidad": 4,
+            "palabras": ["fusible"],
+            "criterio_corriente": None,
+            "tipo_componente": "circuito_control",
+            "subtipo_control": "fusible",
+            "nota": "Cuatro fusibles para protección del circuito de control.",
+        },
+        {
+            "grupo": "Circuito de control - Portafusibles",
+            "cantidad": 4,
+            "palabras": [
+                "portafusible", "porta fusible", "base para fusible"
+            ],
+            "criterio_corriente": None,
+            "tipo_componente": "circuito_control",
+            "subtipo_control": "portafusible",
+            "nota": "Un portafusible por cada fusible: 4 unidades.",
+        },
+        {
             "grupo": "Control automático",
             "cantidad": 1,
             "palabras": ["plc", "rele programable", "controlador"],
@@ -309,6 +384,50 @@ def generar_requerimientos(cotizacion):
             "nota": "Dimensionar después de confirmar equipos, ventilación y reserva física.",
         },
     ]
+
+    if cantidad_variadores > 0:
+        indice_control = next(
+            indice for indice, item in enumerate(requerimientos)
+            if item["grupo"] == "Control automático"
+        )
+        requerimientos.insert(indice_control, {
+            "grupo": "Circuito de control - Relés auxiliares 24 VDC",
+            "cantidad": cantidad_variadores,
+            "palabras": [
+                "rele auxiliar", "rele enchufable", "rele interfaz"
+            ],
+            "criterio_corriente": None,
+            "tipo_componente": "circuito_control",
+            "subtipo_control": "rele_auxiliar_24vdc",
+            "nota": (
+                f"Un relé auxiliar de bobina 24 VDC por variador: "
+                f"{cantidad_variadores} unidad(es)."
+            ),
+        })
+
+    if total > 2:
+        indice_control = next(
+            indice for indice, item in enumerate(requerimientos)
+            if item["grupo"] == "Control automático"
+        )
+        requerimientos.insert(indice_control, {
+            "grupo": "Circuito de potencia - Cuadros de distribución",
+            "cantidad": 3,
+            "palabras": [
+                "cuadro de distribucion", "bloque de distribucion",
+                "bloque repartidor", "repartidor de potencia",
+                "distribuidor de potencia",
+            ],
+            "corriente_requerida": corriente_general,
+            "criterio_corriente": "minima",
+            "tipo_componente": "circuito_control",
+            "subtipo_control": "distribucion",
+            "nota": (
+                f"Tres cuadros o bloques de distribución, cada uno con "
+                f"capacidad mínima de {corriente_general:.2f} A, equivalente "
+                f"a la corriente general derrateada."
+            ),
+        })
 
     if tipo_control == "Un variador por bomba":
         requerimientos.insert(0, {
@@ -437,6 +556,18 @@ def buscar_candidatos(requerimiento, cotizacion, limite=8):
                     fila,
                     requerimiento["subtipo_accesorio"],
                     requerimiento.get("color_requerido"),
+                ),
+                axis=1,
+            )
+        ].copy()
+        if componentes.empty:
+            return componentes.reset_index(drop=True)
+
+    if requerimiento.get("tipo_componente") == "circuito_control":
+        componentes = componentes[
+            componentes.apply(
+                lambda fila: es_componente_circuito_control(
+                    fila, requerimiento["subtipo_control"]
                 ),
                 axis=1,
             )
