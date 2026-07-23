@@ -103,6 +103,7 @@ def crear_estructura_comercial():
             fila["name"] for fila in conexion.execute("PRAGMA table_info(cotizaciones)")
         }
         nuevas_columnas = {
+            "altitud_msnm": "REAL NOT NULL DEFAULT 0",
             "tipo_cambio": "REAL NOT NULL DEFAULT 3.50",
             "descuento_porcentaje": "REAL NOT NULL DEFAULT 0",
             "igv_porcentaje": "REAL NOT NULL DEFAULT 18",
@@ -122,6 +123,14 @@ def crear_estructura_comercial():
                 conexion.execute(
                     f"ALTER TABLE cotizaciones ADD COLUMN {nombre} {definicion}"
                 )
+
+        # Las cotizaciones nuevas y existentes consideran todas las bombas
+        # disponibles para operación, con alternancia definida por el control.
+        conexion.execute(
+            """UPDATE cotizaciones SET bombas_operacion = cantidad_bombas,
+            bombas_reserva = 0
+            WHERE bombas_operacion <> cantidad_bombas OR bombas_reserva <> 0"""
+        )
 
         conexion.execute(
             """
