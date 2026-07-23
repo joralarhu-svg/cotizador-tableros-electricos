@@ -4,6 +4,9 @@ from database.init_db import inicializar_base_datos
 from modules.cotizaciones import obtener_cotizaciones
 from modules.seleccion_componentes import (
     buscar_candidatos,
+    calcular_corriente_corregida,
+    calcular_factor_derrateo,
+    extraer_rango_corriente,
     generar_requerimientos,
     guardar_seleccion,
     obtener_cotizacion,
@@ -32,11 +35,20 @@ etiqueta = st.selectbox("Seleccione la cotización", opciones.keys())
 cotizacion_id = opciones[etiqueta]
 cotizacion = obtener_cotizacion(cotizacion_id)
 
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Bombas", cotizacion["cantidad_bombas"])
 c2.metric("Potencia por bomba", f"{cotizacion['potencia_hp']:g} HP")
-c3.metric("Tensión", f"{cotizacion['tension']} V")
-c4.metric("Presión", f"{cotizacion['presion_trabajo']:g} {cotizacion['unidad_presion']}")
+c3.metric("Corriente nominal", f"{cotizacion['corriente_motor']:g} A")
+c4.metric("Altitud", f"{cotizacion['altitud_msnm']:g} msnm")
+c5.metric("Tensión", f"{cotizacion['tension']} V")
+factor_derrateo = calcular_factor_derrateo(cotizacion["altitud_msnm"])
+corriente_corregida = calcular_corriente_corregida(
+    cotizacion["corriente_motor"], cotizacion["altitud_msnm"]
+)
+st.info(
+    f"Factor de derrateo: {factor_derrateo:.3f} · "
+    f"Corriente corregida por bomba: {corriente_corregida:.2f} A"
+)
 st.caption(f"Control: {cotizacion['tipo_control']} · Sensor: {cotizacion['senal_sensor']}")
 
 requerimientos = generar_requerimientos(cotizacion)
@@ -59,9 +71,19 @@ with st.form("seleccion_componentes"):
         filas = {}
         for fila in candidatos.itertuples():
             estado_stock = "Disponible" if fila.stock >= requerimiento["cantidad"] else "Stock insuficiente"
+            rango = extraer_rango_corriente(
+                f"{fila.descripcion} {fila.modelo or ''}"
+            )
+            capacidad = ""
+            if rango:
+                capacidad = (
+                    f" | Capacidad: {rango[0]:g}-{rango[1]:g} A"
+                    if rango[0] != rango[1]
+                    else f" | Capacidad: {rango[1]:g} A"
+                )
             texto = (
                 f"{fila.codigo} | {fila.descripcion} | Stock: {fila.stock} | "
-                f"{fila.moneda} {fila.costo_unitario:,.2f} | {estado_stock}"
+                f"{fila.moneda} {fila.costo_unitario:,.2f}{capacidad} | {estado_stock}"
             )
             etiquetas[texto] = int(fila.id)
             filas[int(fila.id)] = fila
