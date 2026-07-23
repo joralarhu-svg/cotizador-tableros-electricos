@@ -117,6 +117,48 @@ class CotizacionesTest(unittest.TestCase):
         )
         self.assertTrue(any("solo admite control" in error for error in errores))
 
+    def test_contraincendio_220_admite_estrella_triangulo_y_softstarter(self):
+        from modules.cotizaciones import validar_datos_tecnicos
+
+        datos = {
+            "tipo_tablero": "Contraincendio",
+            "cantidad_bombas": 2,
+            "potencia_hp": 40,
+            "corriente_motor": 105,
+            "potencia_jockey_hp": 3,
+            "corriente_jockey": 8,
+            "altitud_msnm": 0,
+            "tension": 220,
+            "presion_trabajo": 1,
+        }
+        for estrategia in ("Estrella-triángulo", "Softstarter"):
+            datos["tipo_control"] = estrategia
+            self.assertEqual(validar_datos_tecnicos(datos), [])
+
+    def test_contraincendio_380_y_440_solo_admiten_softstarter(self):
+        from modules.cotizaciones import validar_datos_tecnicos
+
+        datos = {
+            "tipo_tablero": "Contraincendio",
+            "cantidad_bombas": 2,
+            "potencia_hp": 40,
+            "corriente_motor": 105,
+            "potencia_jockey_hp": 3,
+            "corriente_jockey": 8,
+            "altitud_msnm": 0,
+            "tipo_control": "Estrella-triángulo",
+            "presion_trabajo": 1,
+        }
+        for tension in (380, 440):
+            datos["tension"] = tension
+            errores = validar_datos_tecnicos(datos)
+            self.assertTrue(any("deben utilizar Softstarter" in error for error in errores))
+
+        datos["tipo_control"] = "Softstarter"
+        for tension in (380, 440):
+            datos["tension"] = tension
+            self.assertEqual(validar_datos_tecnicos(datos), [])
+
     def test_eliminar_cotizacion_borra_relaciones_y_conserva_cliente(self):
         from modules.cotizaciones import (
             eliminar_cotizaciones,
