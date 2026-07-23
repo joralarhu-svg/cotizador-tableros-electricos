@@ -29,7 +29,8 @@ class GeneradorPdfTest(unittest.TestCase):
             "codigo": "VDF-5HP", "descripcion": "Variador de frecuencia",
             "categoria": "Variadores", "marca": "WEG", "modelo": "CFW500",
             "unidad": "und", "stock": 2, "stock_minimo": 0,
-            "costo_unitario": 100.0, "moneda": "USD", "proveedor": "",
+            "costo_unitario": 100.0, "corriente_nominal": 18.0,
+            "moneda": "USD", "proveedor": "",
             "ubicacion": "", "estado": "Activo", "observaciones": "",
         }]))
         cliente_id = registrar_cliente({
