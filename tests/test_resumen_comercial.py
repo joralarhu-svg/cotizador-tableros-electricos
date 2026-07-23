@@ -25,7 +25,8 @@ class ResumenComercialTest(unittest.TestCase):
         guardar_componentes(pd.DataFrame([{
             "codigo": "VDF", "descripcion": "Variador", "categoria": "Variadores",
             "marca": "WEG", "modelo": "CFW500", "unidad": "und", "stock": 2,
-            "stock_minimo": 0, "costo_unitario": 100.0, "moneda": "USD",
+            "stock_minimo": 0, "costo_unitario": 100.0,
+            "corriente_nominal": 18.0, "moneda": "USD",
             "proveedor": "", "ubicacion": "", "estado": "Activo", "observaciones": "",
         }]))
         cliente = registrar_cliente({
