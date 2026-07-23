@@ -89,6 +89,14 @@ def validar_datos_tecnicos(datos):
                 "El tablero contraincendio solo admite control "
                 "Estrella-triángulo o Softstarter."
             )
+        if (
+            datos.get("tension") in (380, 440)
+            and datos.get("tipo_control") != "Softstarter"
+        ):
+            errores.append(
+                "Los tableros contraincendio de 380 V o 440 V "
+                "deben utilizar Softstarter."
+            )
     if datos.get("altitud_msnm", 0) < 0:
         errores.append("La altitud de operación no puede ser negativa.")
     if datos["presion_trabajo"] <= 0:
