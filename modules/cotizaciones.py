@@ -66,12 +66,12 @@ def generar_numero_cotizacion(conexion):
 
 def validar_datos_tecnicos(datos):
     errores = []
-    if datos["bombas_operacion"] + datos["bombas_reserva"] != datos["cantidad_bombas"]:
-        errores.append(
-            "La suma de bombas en operación y reserva debe ser igual al total de bombas."
-        )
+    if datos["cantidad_bombas"] < 1:
+        errores.append("La cantidad de bombas debe ser mayor que cero.")
     if datos["potencia_hp"] <= 0 or datos["corriente_motor"] <= 0:
         errores.append("La potencia y la corriente del motor deben ser mayores que cero.")
+    if datos.get("altitud_msnm", 0) < 0:
+        errores.append("La altitud de operación no puede ser negativa.")
     if datos["presion_trabajo"] <= 0:
         errores.append("La presión de trabajo debe ser mayor que cero.")
     return errores
@@ -89,12 +89,14 @@ def registrar_cotizacion(cliente_id, datos):
             numero, cliente_id, proyecto, cantidad_bombas, bombas_operacion,
             bombas_reserva, potencia_hp, corriente_motor, tension, fases,
             tipo_control, presion_trabajo, unidad_presion, senal_sensor,
-            observaciones, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Borrador')""",
+            observaciones, altitud_msnm, estado)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Borrador')""",
             (numero, cliente_id, datos["proyecto"].strip(), datos["cantidad_bombas"],
-             datos["bombas_operacion"], datos["bombas_reserva"], datos["potencia_hp"],
+             datos["cantidad_bombas"], 0, datos["potencia_hp"],
              datos["corriente_motor"], datos["tension"], datos["fases"],
              datos["tipo_control"], datos["presion_trabajo"], datos["unidad_presion"],
-             datos["senal_sensor"], datos.get("observaciones", "").strip()),
+             datos["senal_sensor"], datos.get("observaciones", "").strip(),
+             datos.get("altitud_msnm", 0)),
         )
         conexion.commit()
         return {"correcto": True, "id": cursor.lastrowid, "numero": numero, "errores": []}
@@ -110,7 +112,8 @@ def obtener_cotizaciones():
     try:
         return pd.read_sql_query(
             """SELECT c.id, c.numero, cl.razon_social AS cliente, c.proyecto,
-            c.cantidad_bombas, c.potencia_hp, c.tension, c.tipo_control,
+            c.cantidad_bombas, c.potencia_hp, c.corriente_motor,
+            c.altitud_msnm, c.tension, c.tipo_control,
             c.presion_trabajo, c.unidad_presion, c.estado, c.fecha_creacion
             FROM cotizaciones c JOIN clientes cl ON cl.id = c.cliente_id
             ORDER BY c.id DESC""",
@@ -118,4 +121,3 @@ def obtener_cotizaciones():
         )
     finally:
         conexion.close()
-
